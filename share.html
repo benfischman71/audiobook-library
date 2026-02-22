@@ -1,1 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ben's Library">
+  <meta name="theme-color" content="#0c0b09">
+  <title>Ben's Audiobook Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--gold:#C9A84C;--gold-bright:#E2C36B;--gold-dim:#8A7233;--bg:#0c0b09;--surface:#1a1914;--surface2:#211f19;--border:#2e2b23;--border2:#3a362c;--text:#e5dfd0;--text2:#9b9484;--text3:#6e6758;--text4:#4a4538;--danger:#C25450;--success:#5A9A6A}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+    h1,h2,.serif{font-family:'Cormorant Garamond',Georgia,serif}
+    input,textarea,select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;font-family:'IBM Plex Sans',sans-serif;outline:none;width:100%;box-sizing:border-box}
+    input:focus,textarea:focus,select:focus{border-color:var(--gold)}select{cursor:pointer;width:auto}
+    ::placeholder{color:var(--text4)}button{font-family:'IBM Plex Sans',sans-serif;cursor:pointer;border:none}
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeScale{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    var E = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+    var useCallback = React.useCallback;
+    var useMemo = React.useMemo;
+    var useRef = React.useRef;
 
+    /* BOOK DATA */
+    const D=[["The End","Ian Kershaw","History / WWII","Chronicles the final collapse of Nazi Germany from 1944-1945. Examines why Germans continued fighting long after the war was clearly lost."],
+["How the Word Is Passed","Clint Smith","History / American Slavery","A poet visits landmarks tied to America's history of slavery. Each chapter examines how different sites remember or distort the legacy of enslavement."],
+["Many Lives, Many Masters","Brian L. Weiss","Spirituality / Psychology","A Yale-trained psychiatrist recounts past-life regression therapy. A controversial but widely read exploration of reincarnation and the afterlife."],
+["The Final Storm","Jeff Shaara","Historical Fiction / WWII","The concluding novel in Shaara's Pacific War trilogy, covering the Battle of Okinawa and the atomic bombings."],
+["The Killer Angels","Michael Shaara","Historical Fiction / Civil War","Pulitzer Prize-winning novel about the Battle of Gettysburg told from both Union and Confederate perspectives."],
+["Adventures in My Youth","Armin Scheiderbauer","Memoir / WWII","A German soldier's firsthand account of fighting on the Eastern Front from 1941-1945."],
+["Furious Hours","Casey Cep","True Crime / Literary Nonfiction","Intertwines a suspected serial killer in Alabama with Harper Lee's attempt to write about the case."],
+["Ordinary Men","Christopher R. Browning","History / Holocaust","Examines how a battalion of ordinary German policemen became mass murderers during the Holocaust."],
+["No Rules Rules","Reed Hastings","Business / Management","Netflix co-founder explains the company's radical corporate culture of freedom and responsibility."],
+["We Germans","Alexander Starritt","Fiction / WWII","A novel framed as a German grandfather's letter to his British grandson about his WWII experience."],
+["The Steel Wave","Jeff Shaara","Historical Fiction / WWII","Covers the D-Day invasion and the Allied campaign in Normandy through multiple perspectives."],
+["Billion Dollar Loser","Reeves Wiedeman","Business / Biography","The dramatic rise and fall of Adam Neumann and his company WeWork."],
+["The Rising Tide","Jeff Shaara","Historical Fiction / WWII","First novel in Shaara's WWII trilogy covering the North Africa and Sicily campaigns."],
+["JFK","Fredrik Logevall","Biography / History","An epic biography covering John F. Kennedy's life from birth through his early political career."],
+["Super Pumped","Mike Isaac","Business / Technology","The inside story of Uber's meteoric rise and CEO Travis Kalanick's turbulent reign."],
+["Gods and Generals","Jeff Shaara","Historical Fiction / Civil War","Prequel to The Killer Angels covering the early years of the Civil War."],
+["The House of Morgan","Ron Chernow","History / Finance","A sweeping history of the J.P. Morgan banking dynasty spanning over 150 years."],
+["Under the Banner of Heaven","Jon Krakauer","True Crime / Religion","Investigates a brutal double murder committed by fundamentalist Mormon brothers in 1984."],
+["To Wake the Giant","Jeff Shaara","Historical Fiction / WWII","A novel centered on the attack on Pearl Harbor told from American and Japanese perspectives."],
+["No Less Than Victory","Jeff Shaara","Historical Fiction / WWII","Covers the final months of the European war including the Battle of the Bulge."],
+["The Nightingale","Kristin Hannah","Historical Fiction / WWII","Two sisters in Nazi-occupied France navigate the war in very different ways."],
+["On Xi Jinping","Kevin Rudd","Politics / Current Affairs","Former Australian PM analyzes Xi Jinping's worldview and ambitions."],
+["The Secret Sharer","Joseph Conrad","Classic Fiction / Nautical","A young sea captain harbors a fugitive who swam to his ship after killing a man."],
+["Typhoon","Joseph Conrad","Classic Fiction / Nautical","Captain MacWhirr stubbornly steers his steamer directly into a devastating typhoon."],
+["The Rising Sun","John Toland","History / WWII","Pulitzer Prize-winning history of the Japanese Empire from 1936 to 1945."],
+["Fear","Bob Woodward","Politics / Current Affairs","Woodward's investigative account of the Trump White House."],
+["Patriot","Alexei Navalny","Memoir / Politics","The posthumously published memoir of Russian opposition leader Alexei Navalny."],
+["Man's Search for Meaning","Viktor E. Frankl","Psychology / Memoir","Holocaust survivor describes his experiences and developed logotherapy centered on finding life's meaning."],
+["The Stone Crusher","Jeremy Dronfield","History / Holocaust","The true story of a father and son who fought to survive multiple Nazi concentration camps."],
+["George Marshall","David L. Roll","Biography / History","A comprehensive biography of George C. Marshall, architect of Allied victory and the Marshall Plan."],
+["Mark Twain","Ron Chernow","Biography / Literary","Ron Chernow's epic biography of America's greatest humorist and literary icon."],
+["Abundance","Ezra Klein and Derek Thompson","Politics / Economics","Argues that America's core problem is its inability to build and produce enough."],
+["Codename Nemo","Charles Lachman","History / WWII","The true story of the daring WWII mission to capture a German U-boat and its Enigma machine."],
+["R.E.D. Marketing","Greg Creed and Ken Muench","Business / Marketing","Former Yum! Brands CEO shares the framework behind building iconic brands."],
+["The Things Our Fathers Saw","Matthew Rozell","History / WWII","Oral histories from WWII veterans of the Pacific Theater."],
+["Race of Aces","John R Bruning","History / WWII","The true story of America's top fighter pilots competing for the title of ace of aces."],
+["The World Remade","G. J. Meyer","History / WWI","A comprehensive history of America's involvement in World War I."],
+["Dark Matter","Blake Crouch","Science Fiction / Thriller","A physicist is abducted and wakes up in an alternate version of his life."],
+["The Egg","Andy Weir","Science Fiction / Short Story","A very short story where a man dies and meets God, who reveals a startling truth."],
+["Remember Us","Robert M. Edsel","History / WWII","The story of art theft and recovery during WWII."],
+["Area 51","Annie Jacobsen","History / Military","An investigative history of America's most secretive military base."],
+["Nuclear War","Annie Jacobsen","Current Affairs / Military","A minute-by-minute scenario of what would happen if a nuclear war broke out."],
+["The Nazi Conspiracy","Brad Meltzer","History / WWII","The true story of a Nazi plot to assassinate FDR, Churchill, and Stalin at Tehran."],
+["Dinner at the Homesick Restaurant","Anne Tyler","Literary Fiction / Family","Three siblings cope differently with their father's abandonment and difficult mother."],
+["Tuxedo Park","Jennet Conant","History / Science","The story of Alfred Lee Loomis, a Wall Street tycoon who funded pivotal WWII weapons research."],
+["Grant","Ron Chernow","Biography / History","A sweeping biography of Ulysses S. Grant from humble beginnings to the presidency."],
+["The Things We Cannot Say","Kelly Rimmer","Historical Fiction / WWII","Dual timeline connecting a modern woman with her Polish grandmother's WWII secrets."],
+["The Russian Five","Keith Gave","Sports / Hockey","How five Soviet hockey players defected to join the Detroit Red Wings."],
+["The Happiest Man on Earth","Eddie Jaku","Memoir / Holocaust","A Holocaust survivor shares his philosophy of choosing happiness despite suffering."],
+["Operation Pedestal","Max Hastings","History / WWII","The harrowing story of the 1942 convoy mission to resupply besieged Malta."],
+["The Tattooist of Auschwitz","Heather Morris","Historical Fiction / Holocaust","Based on the true story of Lale Sokolov, forced to tattoo fellow inmates at Auschwitz."],
+["The Ragged Edge of Night","Olivia Hawker","Historical Fiction / WWII","A former Franciscan friar in Nazi Germany risks everything to shelter Jewish children."],
+["Artemis","Andy Weir","Science Fiction","A heist novel set in humanity's first and only lunar colony."],
+["Children of Time","Adrian Tchaikovsky","Science Fiction","Humanity's last survivors seek a terraformed planet claimed by evolved spiders."],
+["Project Hail Mary","Andy Weir","Science Fiction","An astronaut wakes up alone on a spaceship with no memory of his mission to save Earth."],
+["Operation Chastise","Max Hastings","History / WWII","The story of the famous 1943 Dambusters raid on German dams."],
+["Tom Lake","Ann Patchett","Literary Fiction / Family","A mother tells her three daughters the story of a long-ago love affair."],
+["The Last Hill","Bob Drury and Tom Clavin","History / WWII","The epic story of a Ranger battalion's heroic stand in the Battle of the Bulge."],
+["The Wright Brothers","David McCullough","Biography / History","David McCullough tells the inspiring story of Wilbur and Orville Wright."],
+["The Boy from Block 66","Limor Regev","History / Holocaust","The true story of a young boy who survived Buchenwald concentration camp."],
+["Eight Perfect Murders","Peter Swanson","Mystery / Thriller","A bookstore owner who wrote about perfect mystery murders becomes a suspect."],
+["Ascent to Power","David L. Roll","Biography / History","Chronicles Harry Truman's sudden rise to the presidency after FDR's death."],
+["The Demon of Unrest","Erik Larson","History / Civil War","Erik Larson chronicles the months between Lincoln's election and Fort Sumter."],
+["The Air War Through German Eyes","Jonathan Trigg","History / WWII","The Allied bombing campaign from the perspective of those on the ground."],
+["Left for Dead at Nijmegen","Marcus A. Nanninga","History / WWII","An American paratrooper left behind during Operation Market Garden."],
+["March Violets","Philip Kerr","Mystery / Historical Fiction","Private detective Bernie Gunther navigates 1936 Nazi Berlin's criminal underworld."],
+["Burn Rate","Andy Dunn","Memoir / Business","The Bonobos founder reveals his struggle with bipolar disorder while building a startup."],
+["Growth","Daniel Susskind","Economics / Big Ideas","Examines humanity's relentless pursuit of economic growth and what it means."],
+["The Hopkins Touch","David Roll","Biography / History","Biography of Harry Hopkins, FDR's closest advisor during WWII."],
+["The Goldfinch","Donna Tartt","Literary Fiction","A boy survives a museum bombing and clings to a painting that shapes his life."],
+["The Let Them Theory","Mel Robbins","Self-Help / Psychology","A framework for letting go of what you can't control."],
+["The Nvidia Way","Tae Kim","Business / Technology","Nvidia's rise from a struggling startup to the world's most valuable chip company."],
+["Cold Crematorium","József Debreczeni","Memoir / Holocaust","A Hungarian journalist's searing memoir of survival in Nazi concentration camps."],
+["The Saboteur","Paul Kix","History / WWII","Robert de La Rochefoucauld, a French aristocrat turned Resistance saboteur."],
+["The Passage of Power","Robert A. Caro","Biography / History","The fourth volume of Caro's monumental LBJ biography covering 1958-1964."],
+["Midnight in the Garden of Good and Evil","John Berendt","True Crime / Southern Gothic","A journalist in Savannah's eccentric society and a sensational murder trial."],
+["Defying Hitler","Gordon Thomas","History / WWII","The various plots and conspiracies to overthrow or assassinate Adolf Hitler."],
+["Her Every Fear","Peter Swanson","Mystery / Thriller","A woman apartment-swaps to Boston and discovers her neighbor was murdered."],
+["Going Infinite","Michael Lewis","Business / Biography","Michael Lewis chronicles the rise and fall of Sam Bankman-Fried."],
+["Countdown 1945","Chris Wallace","History / WWII","The dramatic 116-day story from Truman's swearing-in to the atomic bomb."],
+["Behind Closed Doors","B.A. Paris","Mystery / Thriller","A seemingly perfect marriage hides a terrifying secret."],
+["The Liberator","Alex Kershaw","History / WWII","Follows the 157th Infantry from Sicily to the liberation of Dachau."],
+["Beneath a Scarlet Sky","Mark Sullivan","Historical Fiction / WWII","Based on the true story of Pino Lella, an Italian teenager in the Resistance."],
+["Matterhorn","Karl Marlantes","Fiction / Vietnam War","A young Marine lieutenant leads his platoon through brutal Vietnam combat."],
+["Before She Knew Him","Peter Swanson","Mystery / Thriller","A woman becomes convinced her charming neighbor is a murderer."],
+["The Last Battle","Cornelius Ryan","History / WWII","A classic account of the Battle of Berlin and the final days of the Third Reich."],
+["Chickenhawk","Robert Mason","Memoir / Vietnam War","A helicopter pilot's riveting memoir of flying combat missions in Vietnam."],
+["The Last Full Measure","Jeff Shaara","Historical Fiction / Civil War","The sequel to The Killer Angels, from Gettysburg to Appomattox."],
+["The Arsenal of Democracy","A. J. Baime","History / WWII","How Henry Ford transformed the auto industry into a war machine."],
+["American Caesar","William Manchester","Biography / History","William Manchester's sweeping biography of Douglas MacArthur."],
+["Blitzed","Norman Ohler","History / WWII","Reveals the rampant drug use in Nazi Germany."],
+["A Woman of No Importance","Sonia Purnell","Biography / WWII","Virginia Hall, the Allies' most feared agent in France."],
+["The Dog Stars","Peter Heller","Post-Apocalyptic Fiction","A pilot and his dog survive in a post-pandemic world."],
+["The 7 Habits of Highly Effective People","Stephen R. Covey","Self-Help / Business","One of the most influential personal development books ever written."],
+["The Splendid and the Vile","Erik Larson","History / WWII","Churchill's first year as PM during the London Blitz."],
+["Exhalation","Ted Chiang","Science Fiction / Short Stories","Nine stories exploring free will, time, and consciousness."],
+["Catch and Kill","Ronan Farrow","Investigative Journalism","Farrow's account of investigating Harvey Weinstein's abuse."],
+["Red Notice","Bill Browder","Memoir / Politics","An American financier becomes Putin's number one enemy."],
+["Their Eyes Were Watching God","Zora Neale Hurston","Classic Fiction / Literary","Janie Crawford's journey through three marriages in 1930s Florida."],
+["The Winter Fortress","Neal Bascomb","History / WWII","Norwegian commandos sabotaged the Nazi heavy water program."],
+["The President Is Missing","James Patterson and Bill Clinton","Political Thriller","A sitting president goes off the grid to stop a cyberattack."],
+["The Survivors","Adam Frankel","Memoir / Family","A former Obama speechwriter discovers a family secret rooted in the Holocaust."],
+["Titan","Ron Chernow","Biography / Business","The definitive biography of John D. Rockefeller."],
+["The Bedford Boys","Alex Kershaw","History / WWII","A small Virginia town lost 19 young men on D-Day."],
+["Every Man a Hero","Ray Lambert","Memoir / WWII","A D-Day medic's firsthand account of storming Omaha Beach."],
+["The Longest Winter","Alex Kershaw","History / WWII","An intelligence platoon first encountered the German offensive in the Bulge."],
+["Helmet for My Pillow","Robert Leckie","Memoir / WWII","A Marine's memoir of fighting across the Pacific."],
+["What It Takes","Stephen A. Schwarzman","Memoir / Business","The Blackstone co-founder shares lessons from building a financial empire."],
+["Station Eleven","Emily St. John Mandel","Science Fiction / Literary","A Shakespeare company keeps art alive after a devastating pandemic."],
+["Wave","Sonali Deraniyagala","Memoir / Grief","A woman loses her family in the 2004 tsunami."],
+["An Anonymous Girl","Greer Hendricks","Psychological Thriller","A woman signs up for a psychology study that becomes dangerously personal."],
+["The First Wave","Alex Kershaw","History / WWII","The D-Day warriors who led the first assault on Normandy's beaches."],
+["Devotion","Adam Makos","History / Korean War","Two Navy pilots in Korea — a story of courage and brotherhood."],
+["A Higher Call","Adam Makos","History / WWII","A German fighter ace escorted a crippled American bomber to safety."],
+["For Whom the Bell Tolls","Ernest Hemingway","Classic Fiction / War","An American volunteer fights in the Spanish Civil War."],
+["Billion Dollar Whale","Bradley Hope and Tom Wright","Business / True Crime","Jho Low and the 1MDB fraud."],
+["American Kingpin","Nick Bilton","True Crime / Technology","Ross Ulbricht and the Silk Road dark web marketplace."],
+["Hunting Eichmann","Neal Bascomb","History / True Crime","The Mossad operation to capture Adolf Eichmann in Argentina."],
+["The Long Night","Ernst Israel Bornstein","Memoir / Holocaust","A Holocaust survivor's memoir across multiple concentration camps."],
+["Tiger Tracks","Wolfgang Faust","Memoir / WWII","A German Tiger tank commander's account of armored combat."],
+["China Marine","E. B. Sledge","Memoir / WWII","Sledge's post-combat service in China after the Pacific War."],
+["With the Old Breed","E. B. Sledge","Memoir / WWII","The finest memoir of Pacific combat, covering Peleliu and Okinawa."],
+["Spearhead","Adam Makos","History / WWII","An American Pershing tank crew racing to be first into Nazi Germany."],
+["The Perfect Husband","Lisa Gardner","Mystery / Thriller","A woman discovers her husband is an escaped serial killer."],
+["Into the Lion's Mouth","Larry Loftis","History / Espionage","Dusko Popov, the real-life spy who inspired James Bond."],
+["The World as It Is","Ben Rhodes","Memoir / Politics","Obama's deputy NSA provides an intimate account of the White House."],
+["Sons and Soldiers","Bruce Henderson","History / WWII","German-born Jews who returned as U.S. soldiers to fight the Nazis."],
+["D Day Through German Eyes","Holger Eckhertz","History / WWII","Interviews with German soldiers who defended Normandy on D-Day."],
+["Shoe Dog","Phil Knight","Memoir / Business","Nike founder Phil Knight tells the story of building the brand."],
+["The Last Panther","Wolfgang Faust","Memoir / WWII","A German Panther tank crew in the final days on the Western Front."],
+["A Place Called Freedom","Ken Follett","Historical Fiction","A Scottish coal miner fights for freedom in 1760s Britain."],
+["Jackdaws","Ken Follett","Historical Fiction / WWII","Women agents parachute into France to destroy a telephone exchange."],
+["Working","Robert A. Caro","Memoir / Writing","The biographer reflects on his craft and decades-long process."],
+["The Silent Patient","Alex Michaelides","Psychological Thriller","A painter shoots her husband and never speaks again."],
+["Our Iceberg Is Melting","John Kotter","Business / Leadership","A fable illustrating organizational change management."],
+["Kushner, Inc.","Vicky Ward","Politics / Biography","Jared Kushner and Ivanka Trump's rise to power."],
+["The Spy and the Traitor","Ben Macintyre","History / Espionage","Oleg Gordievsky, the KGB colonel who spied for MI6."],
+["Zealot","Reza Aslan","History / Religion","A provocative examination of the historical Jesus of Nazareth."],
+["Origin","Dan Brown","Fiction / Thriller","Robert Langdon faces a mystery involving a futurist's discovery."],
+["The Undoing Project","Michael Lewis","Psychology / Nonfiction","The story of Kahneman and Tversky's groundbreaking partnership."],
+["Zero to One","Peter Thiel","Business / Entrepreneurship","True innovation means creating something entirely new."],
+["The Lean Startup","Eric Ries","Business / Entrepreneurship","A scientific approach to creating and managing startups."],
+["Bad Blood","John Carreyrou","Business / True Crime","The Theranos and Elizabeth Holmes fraud."],
+["Edge of Eternity","Ken Follett","Historical Fiction","Five families through the 1960s-1980s."],
+["Eye of the Needle","Ken Follett","Thriller / WWII","A German spy discovers the Allies' D-Day deception."],
+["Winter of the World","Ken Follett","Historical Fiction","Families through WWII in the Century Trilogy."],
+["World Without End","Ken Follett","Historical Fiction / Medieval","14th-century Kingsbridge during plague and war."],
+["The Accidental President","A. J. Baime","History / Biography","Harry Truman's sudden ascent to the presidency."],
+["Hornet Flight","Ken Follett","Thriller / WWII","A Danish couple discovers a German radar installation."],
+["A Dangerous Fortune","Ken Follett","Historical Fiction / Victorian","Banking, scandal, and betrayal in Victorian London."],
+["Night over Water","Ken Follett","Thriller / Historical Fiction","Set aboard a Pan Am Clipper on the last flight before WWII."],
+["Measure What Matters","John Doerr","Business / Management","The OKR goal-setting system used by Google and Intel."],
+["The Billion Dollar Spy","David E. Hoffman","History / Espionage","Tolkachev, the CIA's most valuable Cold War asset."],
+["The Girl on the Train","Paula Hawkins","Mystery / Thriller","A commuter becomes entangled in a missing persons investigation."],
+["The 4-Hour Workweek","Timothy Ferriss","Self-Help / Business","Strategies for lifestyle design and escaping the 9-to-5."],
+["Team of Rivals","Doris Kearns Goodwin","Biography / History","Lincoln's genius assembling his cabinet from rivals."],
+["The First Phone Call from Heaven","Mitch Albom","Fiction / Inspirational","A small town receives phone calls from the deceased."],
+["Fall of Giants","Ken Follett","Historical Fiction","Five families through WWI and the Russian Revolution."],
+["A Separate Peace","John Knowles","Classic Fiction / Coming-of-Age","Two boys at a boarding school navigate friendship and rivalry."],
+["The Girl in the Spider's Web","David Lagercrantz","Mystery / Thriller","Lisbeth Salander returns in a case involving hackers and spies."],
+["Shattered","Jonathan Allen","Politics / Nonfiction","Inside Hillary Clinton's 2016 campaign and its defeat."],
+["Hitler","Volker Ullrich","Biography / History","A comprehensive biography of Hitler's rise to power."],
+["Bush","Jean Edward Smith","Biography / History","A critical biography of George W. Bush's presidency."],
+["Fahrenheit 451","Ray Bradbury","Classic Fiction / Dystopian","In a future where books are banned, a fireman questions everything."],
+["Slaughterhouse-Five","Kurt Vonnegut","Classic Fiction / War","Billy Pilgrim becomes unstuck in time."],
+["The Bell Jar","Sylvia Plath","Classic Fiction / Literary","A young woman's descent into mental illness in 1950s New York."],
+["The Real All Americans","Sally Jenkins","Sports / History","The Carlisle Indian School football team that revolutionized the game."],
+["Elon Musk","Ashlee Vance","Biography / Technology","The first comprehensive biography of Elon Musk."],
+["Ordinary People","Judith Guest","Literary Fiction / Family","An affluent suburban family unravels after tragedy."],
+["American Ulysses","Ronald C. White","Biography / History","A major biography reclaiming Grant."],
+["Facebook: The Inside Story","Steven Levy","Technology / Business","Inside Facebook from founding through controversies."],
+["Caste","Isabel Wilkerson","Sociology / History","America's hidden caste system."],
+["Too Much and Never Enough","Mary L. Trump","Memoir / Politics","Trump's niece reveals toxic family dynamics."],
+["White Fragility","Robin DiAngelo","Sociology / Race","Why white people find it difficult to talk about racism."],
+["This Is Not a Fashion Story","Danielle Bernstein","Memoir / Business","Building the WeWoreWhat brand."],
+["The Holocaust","Dan Stone","History / Holocaust","A comprehensive modern history of the Holocaust."],
+["Brought to Battle","J. Scott Payne","Historical Fiction / WWII","Soldiers through brutal World War II combat."],
+["No Surrender","Christopher Edmonds","History / WWII","A father's heroism saved over 200 soldiers in the Bulge."],
+["The Midnight Library","Matt Haig","Fiction / Philosophical","A woman between life and death explores lives she could have lived."],
+["Blood, Dust and Snow","Friedrich Sander","Memoir / WWII","A diary of a German soldier on the Eastern Front."],
+["Trust","Hernan Diaz","Literary Fiction","Pulitzer Prize-winning novel about a wealthy couple in 1920s New York."],
+["Whatever It Took","Henry Langrehr","Memoir / WWII","A paratrooper's memoir of jumping into Normandy on D-Day."],
+["Remarkably Bright Creatures","Shelby Van Pelt","Fiction","A widow forms an unlikely connection with a giant Pacific octopus."],
+["The Path Between the Seas","David McCullough","History","The creation of the Panama Canal."],
+["Hello Beautiful","Ann Napolitano","Literary Fiction / Family","Four sisters in Chicago navigate love and family secrets."],
+["The Wild Blue","Stephen E. Ambrose","History / WWII","Young men who flew B-24 bombers over Germany."],
+["Blind Man's Bluff","Sherry Sontag","History / Military","American submarine espionage during the Cold War."],
+["Double Cross","Ben Macintyre","History / WWII","The D-Day deception and its double agents."],
+["The Inner Circle","Brad Meltzer","Fiction / Thriller","An archivist discovers a secret at the National Archives."],
+["A Wing and a Prayer","Harry H. Crosby","Memoir / WWII","A B-17 navigator with the 100th Bomb Group."],
+["Rogue Heroes","Ben Macintyre","History / WWII","The authorized history of the SAS."],
+["Mayflower","Nathaniel Philbrick","History / Colonial America","The Pilgrims and their relationship with Native Americans."],
+["In the Heart of the Sea","Nathaniel Philbrick","History / Maritime","The whale ship Essex that inspired Moby-Dick."],
+["A Rumor of War","Philip Caputo","Memoir / Vietnam War","One of the finest memoirs of the Vietnam War."],
+["The Panzer Killers","Daniel P. Bolger","History / WWII","General Maurice Rose and the 3rd Armored Division."],
+["The Kind Worth Killing","Peter Swanson","Mystery / Thriller","Two strangers on a flight bond over a shocking proposal."],
+["Washington","Ron Chernow","Biography / History","Chernow's definitive biography of George Washington."],
+["A Bitter Rain","James D. Shipman","Historical Fiction / WWII","WWII's impact on ordinary people."],
+["Bonhoeffer","Eric Metaxas","Biography / WWII","The German pastor who stood against Hitler."],
+["The Lincoln Highway","Amor Towles","Fiction / Historical","In 1952, two brothers' plans are hijacked by escapees."],
+["The Personal Librarian","Marie Benedict","Historical Fiction","Belle da Costa Greene, J.P. Morgan's librarian hiding her identity."],
+["Pacific Crucible","Ian W. Toll","History / WWII","The Pacific War from Pearl Harbor to Midway."],
+["The Conquering Tide","Ian W. Toll","History / WWII","The island-hopping campaign from 1942 to 1944."],
+["The Volunteer","Jack Fairweather","History / Holocaust","Witold Pilecki voluntarily infiltrated Auschwitz."],
+["Facing the Mountain","Daniel James Brown","History / WWII","Japanese American soldiers fought while families were interned."],
+["The Mosquito Bowl","Buzz Bissinger","History / WWII","A football game between Marines on Guadalcanal."],
+["Twilight of the Gods","Ian Toll","History / WWII","The Pacific War's endgame from 1944 to surrender."],
+["Elon Musk","Walter Isaacson","Biography / Technology","Isaacson's biography based on extensive access to Musk."],
+["The Ride of a Lifetime","Robert Iger","Memoir / Business","Former Disney CEO shares leadership principles."],
+["Grace","Cody Keenan","Memoir / Politics","Behind Obama's Charleston church shooting eulogy."],
+["Benjamin Franklin","Walter Isaacson","Biography / History","Isaacson's biography of Benjamin Franklin."],
+["Leonardo da Vinci","Walter Isaacson","Biography / Art & Science","Biography of the Renaissance man from his notebooks."],
+["Avenue of Spies","Alex Kershaw","History / WWII","An American doctor spied for the Resistance in Paris."],
+["The Last Days of Night","Graham Moore","Historical Fiction","Edison vs. Westinghouse over the light bulb."],
+["Against All Odds","Alex Kershaw","History / WWII","Four Medal of Honor recipients from the 1st Infantry Division."],
+["If You Tell","Gregg Olsen","True Crime","A mother's sadistic abuse of her daughters."],
+["We Were Soldiers Once... and Young","Harold G. Moore","History / Vietnam War","The Battle of Ia Drang Valley."],
+["Born to Run","Bruce Springsteen","Memoir / Music","Springsteen's autobiography."],
+["Alone","Michael Korda","History / WWII","Britain's stand alone against Nazi Germany in 1940."],
+["Hanns and Rudolf","Thomas Harding","History / Holocaust","A refugee tracked down the commandant of Auschwitz."],
+["The Envoy","Alex Kershaw","History / Holocaust","Raoul Wallenberg saved thousands of Jews in Budapest."],
+["How to Change Your Mind","Michael Pollan","Science / Psychology","The new science of psychedelics."],
+["Dear Edward","Ann Napolitano","Literary Fiction","A boy is the sole survivor of a plane crash."],
+["Escape From the Deep","Alex Kershaw","History / WWII","Submariners survived the sinking of USS Tang."],
+["In Harm's Way","Doug Stanton","History / WWII","The USS Indianapolis after delivering atomic bomb components."],
+["Eisenhower in War and Peace","Jean Edward Smith","Biography / History","A comprehensive biography of Eisenhower."],
+["Gambler","Billy Walters","Memoir / Sports","The most successful sports bettor in history."],
+["Truman","David McCullough","Biography / History","Pulitzer Prize-winning biography of Harry S. Truman."],
+["A Gentleman in Moscow","Amor Towles","Literary Fiction / Historical","A count under house arrest discovers life within a hotel."],
+["The Last 100 Days","John Toland","History / WWII","The final hundred days of the European war."],
+["A Man Called Intrepid","William Stevenson","History / Espionage","The Canadian spymaster who ran British intelligence."],
+["Deep River","Karl Marlantes","Historical Fiction","Finnish immigrants in the Pacific Northwest."],
+["The Forgotten Soldier","Guy Sajer","Memoir / WWII","A soldier's memoir of the Eastern Front."],
+["Boyd","Robert Coram","Biography / Military","The maverick pilot who revolutionized military strategy."],
+["The Things They Carried","Tim O'Brien","Fiction / Vietnam War","Interconnected stories about a platoon in Vietnam."],
+["The Women","Kristin Hannah","Historical Fiction / Vietnam","A young Army nurse volunteers for duty in Vietnam."],
+["Prisoners of the Castle","Ben Macintyre","History / WWII","The true story of Colditz Castle POW camp."],
+["Thinking, Fast and Slow","Daniel Kahneman","Psychology / Economics","The two systems that drive how we think."],
+["Panzer Commander","Hans von Luck","Memoir / WWII","A German Panzer officer from D-Day to Berlin."],
+["Ardennes 1944","Antony Beevor","History / WWII","Beevor's definitive account of the Battle of the Bulge."],
+["The Pale Criminal","Philip Kerr","Mystery / Historical Fiction","Bernie Gunther in 1938 Berlin."],
+["A German Requiem","Philip Kerr","Mystery / Historical Fiction","Bernie Gunther in postwar Vienna."],
+["Prussian Blue","Philip Kerr","Mystery / Historical Fiction","Bernie Gunther across 1939 and 1956."],
+["Berlin Diary","William L. Shirer","History / WWII","An American journalist's account of Nazi Germany 1934-1941."],
+["Every Vow You Break","Peter Swanson","Mystery / Thriller","A honeymoon secret threatens everything."],
+["Nine Lives","Peter Swanson","Mystery / Thriller","Nine strangers on a list, then people start dying."],
+["The Power Law","Sebastian Mallaby","Business / Finance","A definitive history of venture capital."],
+["The Plot Against America","Philip Roth","Fiction / Alternate History","What if Lindbergh aligned America with the Axis."],
+["All the Light We Cannot See","Anthony Doerr","Historical Fiction / WWII","A blind French girl and German boy in occupied Saint-Malo."],
+["The Bomber Mafia","Malcolm Gladwell","History / WWII","Precision bombing vs. incendiary bombing."],
+["Isaac's Storm","Erik Larson","History / Disaster","The 1900 Galveston hurricane."],
+["HHhH","Laurent Binet","Historical Fiction / WWII","The assassination of Reinhard Heydrich."],
+["Bomber","Len Deighton","Historical Fiction / WWII","A single RAF bombing raid from multiple perspectives."],
+["Freedom's Forge","Arthur Herman","History / WWII","How American business mobilized to win WWII."],
+["Crusade in Europe","Dwight D. Eisenhower","Memoir / WWII","Eisenhower's account of commanding the Allied forces."],
+["The Little Liar","Mitch Albom","Fiction / Historical","A boy whose talent for lying becomes survival tool and curse."],
+["The Idea Factory","Jon Gertner","History / Science","Bell Labs and its transformative inventions."],
+["A Promised Land","Barack Obama","Memoir / Politics","Obama's presidential memoir."],
+["Educated","Tara Westover","Memoir / Education","From survivalist family to Cambridge PhD."],
+["Swing Time","Zadie Smith","Literary Fiction","Two girls bond over dance but diverge dramatically."],
+["The Virgin Suicides","Jeffrey Eugenides","Literary Fiction","The mysterious Lisbon sisters."],
+["Rodham","Curtis Sittenfeld","Fiction / Alternate History","What if Hillary never married Bill."],
+["The Boy Who Drew Auschwitz","Thomas Geve","Memoir / Holocaust","A child survivor's drawings document camp life."],
+["1944","Jay Winik","History / WWII","The pivotal year that changed history."],
+["Until the Eyes Shut","Andreas Hartinger","Memoir / WWII","A machine gunner on the Eastern Front."],
+["Winter Men","Jesper Bugge Kold","Historical Fiction / WWII","Characters on both sides from Denmark to the Eastern Front."],
+["Wings of War","David Fairbank White","History / WWII","The WWII fighter planes that saved the Allies."],
+["An Honest Woman","Charlotte Shane","Memoir","Reflections on intimacy, relationships, and identity."],
+["40 Thieves on Saipan","Joseph Tachovsky","History / WWII","Hand-picked Marines on Saipan."],
+["Fur Volk and Fuhrer","Erwin Bartmann","Memoir / WWII","A young German in the Leibstandarte SS division."],
+["Portrait of a Portrait","Mariah Carey","Memoir / Music","An Audible Original where Mariah Carey reflects on her life and iconic career."],
+["One Day, Everyone Will Have Always Been Against the War","Omar El Akkad","Fiction / War","A novel exploring how societies remember and rewrite the narratives of conflict."],
+["The Boys in the Light","Nina Willner","History / Cold War","Explores the lives of young people caught between East and West during the Cold War."]];
+
+    var BOOKS = D.map(function(r, i) {
+      return {id: "b" + i, title: r[0], author: r[1], category: r[2], overview: r[3], rating: 0, fav: false};
+    });
+
+    var CATS = [];
+    var catSet = {};
+    BOOKS.forEach(function(b) { if (!catSet[b.category]) { catSet[b.category] = true; CATS.push(b.category); }});
+    CATS.sort();
+
+    /* COLOR MAP */
+    var CP = {History:{h:215,s:30},Memoir:{h:28,s:35},Biography:{h:145,s:25},Fiction:{h:280,s:25},"Historical Fiction":{h:42,s:30},Mystery:{h:235,s:25},"Science Fiction":{h:185,s:30},Business:{h:70,s:25},"Self-Help":{h:15,s:30},Psychology:{h:290,s:25},"True Crime":{h:0,s:30},Politics:{h:230,s:20},"Classic Fiction":{h:38,s:35},"Literary Fiction":{h:270,s:20},Thriller:{h:345,s:25},Sports:{h:155,s:28}};
+    function getHue(c) { var b = c.split(" / ")[0]; return CP[b] || {h: (c.length * 37) % 360, s: 22}; }
+    function hsh(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
+
+    /* COVER */
+    /* COVER CACHE */
+    var _coverCache = {};
+    try { var _cc = localStorage.getItem("ab-covers"); if (_cc) _coverCache = JSON.parse(_cc); } catch(e) {}
+    var _coverQueue = [];
+    var _coverFetching = false;
+
+    function _fetchNextCover() {
+      if (_coverFetching || _coverQueue.length === 0) return;
+      _coverFetching = true;
+      var item = _coverQueue.shift();
+      var q = encodeURIComponent(item.title + " " + item.author);
+      fetch("https://www.googleapis.com/books/v1/volumes?q=" + q + "&maxResults=1")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var thumb = data.items && data.items[0] && data.items[0].volumeInfo && data.items[0].volumeInfo.imageLinks;
+          var url = thumb ? (thumb.thumbnail || thumb.smallThumbnail || "") : "";
+          if (url) url = url.replace("http://", "https://");
+          _coverCache[item.key] = url || "none";
+          try { localStorage.setItem("ab-covers", JSON.stringify(_coverCache)); } catch(e) {}
+          if (item.cb) item.cb(url);
+        })
+        .catch(function() { _coverCache[item.key] = "none"; if (item.cb) item.cb(""); })
+        .finally(function() { _coverFetching = false; setTimeout(_fetchNextCover, 150); });
+    }
+
+    function requestCover(title, author, cb) {
+      var key = title + "|" + author;
+      if (_coverCache[key]) { cb(_coverCache[key] === "none" ? "" : _coverCache[key]); return; }
+      _coverQueue.push({key: key, title: title, author: author, cb: cb});
+      _fetchNextCover();
+    }
+
+    function Cover(props) {
+      var imgState = useState(null);
+      var img = imgState[0]; var setImg = imgState[1];
+      var failedState = useState(false);
+      var failed = failedState[0]; var setFailed = failedState[1];
+
+      useEffect(function() {
+        requestCover(props.title, props.author, function(url) { if (url) setImg(url); else setFailed(true); });
+      }, [props.title, props.author]);
+
+      // Generated fallback
+      var hs = getHue(props.category);
+      var h = hs.h, s = hs.s;
+      var v = hsh(props.title + props.author);
+      var w = props.title.replace(/^(The|A|An)\s+/i, "").split(/[\s:,]+/).filter(function(x){return x.length>0;});
+      var disp = w.slice(0, 3).join(" ");
+      var stripe = v % 3 !== 0;
+      var sp = 10 + (v % 28);
+
+      if (img && !failed) {
+        return E("div", {style:{width:52,height:76,borderRadius:"3px 5px 5px 3px",overflow:"hidden",flexShrink:0,boxShadow:"3px 2px 8px rgba(0,0,0,0.4)",background:"var(--surface)"}},
+          E("img", {src: img, style:{width:"100%",height:"100%",objectFit:"cover"}, onError: function(){setFailed(true);}})
+        );
+      }
+
+      return E("div", {style: {width:52,height:76,borderRadius:"3px 5px 5px 3px",overflow:"hidden",flexShrink:0,background:"linear-gradient(155deg,hsl("+h+","+s+"%,14%),hsl("+h+","+(s-5)+"%,9%))",border:"1px solid hsl("+h+","+s+"%,22%)",boxShadow:"3px 2px 8px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"8px 5px",position:"relative",boxSizing:"border-box"}},
+        E("div", {style: {position:"absolute",left:0,top:0,bottom:0,width:3,background:"linear-gradient(180deg,hsl("+h+","+(s+10)+"%,40%),hsl("+h+","+s+"%,25%))"}}),
+        stripe ? E("div", {style: {position:"absolute",left:4,right:4,top:sp,height:1,background:"hsl("+h+","+s+"%,25%)"}}) : null,
+        E("div", {style: {fontSize:7,fontWeight:"bold",color:"hsl("+h+","+(s+15)+"%,65%)",textAlign:"center",lineHeight:1.25,fontFamily:"'Cormorant Garamond',Georgia,serif",wordBreak:"break-word",maxHeight:36,overflow:"hidden",paddingLeft:2,textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}, disp),
+        E("div", {style: {fontSize:6,color:"hsl("+h+","+s+"%,40%)",marginTop:4,fontFamily:"'Cormorant Garamond',Georgia,serif",letterSpacing:0.5,textTransform:"uppercase"}}, props.author.split(" ").pop())
+      );
+    }
+
+    /* STARS */
+    function Stars(props) {
+      return E("span", {style:{whiteSpace:"nowrap"}},
+        [1,2,3,4,5].map(function(i) {
+          return E("span", {key: i, onClick: function(e) { e.stopPropagation(); if (props.onRate) props.onRate(i === props.rating ? 0 : i); },
+            style: {fontSize:16,color:i<=props.rating?"#C9A84C":"#5A5545",cursor:"pointer",padding:"0 1px",userSelect:"none",transition:"color 0.15s"}
+          }, i <= props.rating ? "\u2605" : "\u2606");
+        })
+      );
+    }
+
+    /* SUPABASE CLIENT */
+    function createClient(url, key) {
+      var base = url.replace(/\/$/, "");
+      var hd = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json", "Prefer": "return=representation"};
+      return {
+        select: function(t) { return fetch(base + "/rest/v1/" + t + "?select=*", {headers: hd}).then(function(r) { if (!r.ok) throw new Error("select failed"); return r.json(); }); },
+        upsert: function(t, rows) { return fetch(base + "/rest/v1/" + t, {method:"POST",headers:Object.assign({}, hd, {"Prefer":"resolution=merge-duplicates,return=representation"}),body:JSON.stringify(rows)}).then(function(r) { if (!r.ok) throw new Error("upsert failed"); return r.json(); }); },
+        del: function(t, id) { return fetch(base + "/rest/v1/" + t + "?id=eq." + encodeURIComponent(id), {method:"DELETE",headers:hd}); },
+        test: function() { return fetch(base + "/rest/v1/", {headers: hd}).then(function(r) { return r.ok; }); }
+      };
+    }
+
+    /* GOOGLE BOOKS LOOKUP */
+    function lookupBook(title, author) {
+      var q = encodeURIComponent(title + (author ? " " + author : ""));
+      return fetch("https://www.googleapis.com/books/v1/volumes?q=" + q + "&maxResults=1")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var item = data.items && data.items[0] && data.items[0].volumeInfo;
+          if (!item) return null;
+          var desc = (item.description || "").replace(/<[^>]*>/g, "");
+          return {
+            title: item.title || "",
+            author: item.authors ? item.authors.join(", ") : "",
+            category: item.categories ? item.categories[0] : "",
+            overview: desc.length > 300 ? desc.substring(0, 300) + "..." : desc
+          };
+        });
+    }
+
+    /* ADD BOOK FORM - isolated component, no parent re-renders */
+    function AddBookForm(props) {
+      var tState = useState(""); var t = tState[0]; var setT = tState[1];
+      var aState = useState(""); var a = aState[0]; var setA = aState[1];
+      var cState = useState(""); var c = cState[0]; var setC = cState[1];
+      var oState = useState(""); var o = oState[0]; var setO = oState[1];
+      var busyState = useState(false); var busy = busyState[0]; var setBusy = busyState[1];
+      var msgState = useState(""); var msg = msgState[0]; var setMsg = msgState[1];
+
+      function doSearch() {
+        if (!t.trim()) return;
+        setBusy(true);
+        setMsg("Looking up...");
+        lookupBook(t, a).then(function(result) {
+          if (result) {
+            if (result.title) setT(result.title);
+            if (result.author) setA(result.author);
+            if (result.category) setC(result.category);
+            if (result.overview) setO(result.overview);
+            setMsg("Book found!");
+          } else { setMsg("No results found"); }
+        }).catch(function() { setMsg("Lookup failed"); }).finally(function() { setBusy(false); setTimeout(function(){setMsg("");}, 2000); });
+      }
+
+      function doAdd() {
+        if (!t.trim() || !a.trim()) { setMsg("Title and author required"); setTimeout(function(){setMsg("");}, 2000); return; }
+        props.onAdd({id: "c" + Date.now(), title: t.trim(), author: a.trim(), category: c.trim() || "Uncategorized", overview: o.trim(), rating: 0, fav: false, custom: true});
+      }
+
+      return E("div", null,
+        E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
+        E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
+          E("div", {style:{display:"flex",gap:8}},
+            E("input", {placeholder:"Type a book title...",value:t,onChange:function(e){setT(e.target.value);},onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();doSearch();}},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
+            E("button", {onClick:doSearch,disabled:busy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:busy?0.4:1}}, busy ? "..." : "Search")
+          ),
+          msg ? E("div", {style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13}}, msg) : null,
+          E("input", {placeholder:"Author",value:a,onChange:function(e){setA(e.target.value);},autoComplete:"off"}),
+          E("input", {placeholder:"Category (e.g. History / WWII)",value:c,onChange:function(e){setC(e.target.value);},autoComplete:"off"}),
+          E("textarea", {placeholder:"Overview",value:o,onChange:function(e){setO(e.target.value);},rows:3,style:{resize:"vertical"}}),
+          E("div", {style:{display:"flex",gap:8,marginTop:4}},
+            E("button", {onClick:doAdd,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Add to Library"),
+            E("button", {onClick:props.onClose,style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
+          )
+        )
+      );
+    }
+
+    /* MAIN APP */
+    function App() {
+      var booksState = useState(BOOKS); var books = booksState[0]; var setBooks = booksState[1];
+      var searchState = useState(""); var search = searchState[0]; var setSearch = searchState[1];
+      var sortState = useState("title-asc"); var sort = sortState[0]; var setSort = sortState[1];
+      var catFState = useState("All"); var catF = catFState[0]; var setCatF = catFState[1];
+      var ratFState = useState("All"); var ratF = ratFState[0]; var setRatF = ratFState[1];
+      var expState = useState(null); var expanded = expState[0]; var setExpanded = expState[1];
+      var showAddState = useState(false); var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
+      var showShareState = useState(false); var showShare = showShareState[0]; var setShowShare = showShareState[1];
+      var showSettingsState = useState(false); var showSettings = showSettingsState[0]; var setShowSettings = showSettingsState[1];
+      var addKeyState = useState(0); var addKey = addKeyState[0]; var setAddKey = addKeyState[1];
+      var toastState = useState(""); var toast = toastState[0]; var setToast = toastState[1];
+      var descState = useState({}); var descs = descState[0]; var setDescs = descState[1];
+      var loadDescState = useState(null); var loadDesc = loadDescState[0]; var setLoadDesc = loadDescState[1];
+      
+      var syncState = useState("local"); var syncStatus = syncState[0]; var setSyncStatus = syncState[1];
+      var supaUrlState = useState("https://cfwzrmlygzdsvitjfxze.supabase.co"); var supaUrl = supaUrlState[0]; var setSupaUrl = supaUrlState[1];
+      var supaKeyState = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc"); var supaKey = supaKeyState[0]; var setSupaKey = supaKeyState[1];
+      var settUrlState = useState("https://cfwzrmlygzdsvitjfxze.supabase.co"); var settingsUrl = settUrlState[0]; var setSettingsUrl = settUrlState[1];
+      var settKeyState = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc"); var settingsKey = settKeyState[0]; var setSettingsKey = settKeyState[1];
+      var connectingState = useState(false); var connecting = connectingState[0]; var setConnecting = connectingState[1];
+      var clientRef = useRef(null);
+
+      function flash(m) { setToast(m); setTimeout(function() { setToast(""); }, 2200); }
+
+      // Init from localStorage
+      useEffect(function() {
+        var saved = localStorage.getItem("ab-lib-data");
+        if (saved) {
+          try {
+            var d = JSON.parse(saved);
+            if (d.ratings || d.favs) {
+              setBooks(function(prev) {
+                return prev.map(function(b) {
+                  var updates = {};
+                  if (d.ratings && d.ratings[b.title]) updates.rating = d.ratings[b.title];
+                  if (d.favs && d.favs[b.title]) updates.fav = true;
+                  return Object.keys(updates).length ? Object.assign({}, b, updates) : b;
+                });
+              });
+            }
+            if (d.custom && d.custom.length) {
+              setBooks(function(prev) {
+                var existing = {};
+                prev.forEach(function(b) { existing[b.title.toLowerCase()] = true; });
+                var newBooks = d.custom.filter(function(b) { return !existing[b.title.toLowerCase()]; });
+                return prev.concat(newBooks);
+              });
+            }
+          } catch(e) {}
+        }
+      }, []);
+
+      // Supabase sync
+      useEffect(function() {
+        if (!supaUrl || !supaKey) { setSyncStatus("local"); return; }
+        var client = createClient(supaUrl, supaKey);
+        clientRef.current = client;
+        setSyncStatus("syncing");
+        client.select("books").then(function(remote) {
+          if (remote.length > 0) {
+            setBooks(remote);
+          } else {
+            // Push local books to cloud in batches
+            var local = BOOKS;
+            var savedData = localStorage.getItem("ab-lib-data");
+            if (savedData) {
+              try {
+                var d = JSON.parse(savedData);
+                if (d.ratings) local = local.map(function(b) { return d.ratings[b.title] ? Object.assign({}, b, {rating: d.ratings[b.title]}) : b; });
+              } catch(e) {}
+            }
+            var promises = [];
+            for (var i = 0; i < local.length; i += 50) {
+              promises.push(client.upsert("books", local.slice(i, i + 50)));
+            }
+            return Promise.all(promises);
+          }
+        }).then(function() {
+          setSyncStatus("synced");
+        }).catch(function(e) {
+          console.error("Sync error:", e);
+          setSyncStatus("error");
+        });
+      }, [supaUrl, supaKey]);
+
+      function saveLocal(updated) {
+        var ratings = {};
+        var favs = {};
+        updated.forEach(function(b) { if (b.rating > 0) ratings[b.title] = b.rating; if (b.fav) favs[b.title] = true; });
+        var custom = updated.filter(function(b) { return b.custom; });
+        localStorage.setItem("ab-lib-data", JSON.stringify({ratings: ratings, favs: favs, custom: custom}));
+      }
+
+      function pushCloud(items) {
+        if (!clientRef.current) return;
+        setSyncStatus("syncing");
+        clientRef.current.upsert("books", items).then(function() {
+          setSyncStatus("synced");
+        }).catch(function() { setSyncStatus("error"); });
+      }
+
+      function handleRate(id, r) {
+        setBooks(function(prev) {
+          var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {rating: r}) : b; });
+          saveLocal(u);
+          var changed = u.find(function(b) { return b.id === id; });
+          if (changed) pushCloud([changed]);
+          return u;
+        });
+      }
+
+      function handleFav(id) {
+        setBooks(function(prev) {
+          var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {fav: !b.fav}) : b; });
+          saveLocal(u);
+          var changed = u.find(function(b) { return b.id === id; });
+          if (changed) pushCloud([changed]);
+          return u;
+        });
+      }
+
+      // Fetch longer description when expanding a book
+      useEffect(function() {
+        if (!expanded) return;
+        var book = books.find(function(b) { return b.id === expanded; });
+        if (!book || descs[expanded]) return;
+        setLoadDesc(expanded);
+        var q = encodeURIComponent(book.title + " " + book.author);
+        fetch("https://www.googleapis.com/books/v1/volumes?q=" + q + "&maxResults=1")
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var item = data.items && data.items[0] && data.items[0].volumeInfo;
+            if (item && item.description) {
+              var desc = item.description.replace(/<[^>]*>/g, "");
+              setDescs(function(prev) { var n = Object.assign({}, prev); n[expanded] = desc; return n; });
+            }
+          }).catch(function(){}).finally(function() { setLoadDesc(null); });
+      }, [expanded]);
+
+      // Search for book when adding
+      function onBookAdded(book) {
+        setBooks(function(prev) {
+          var u = prev.concat([book]);
+          saveLocal(u);
+          pushCloud([book]);
+          return u;
+        });
+        setShowAdd(false);
+        setAddKey(function(k) { return k + 1; });
+        flash("Book added!");
+      }
+
+      function handleDelete(id) {
+        setBooks(function(prev) {
+          var u = prev.filter(function(b) { return b.id !== id; });
+          saveLocal(u);
+          if (clientRef.current) clientRef.current.del("books", id).catch(function(){});
+          return u;
+        });
+        setExpanded(null);
+        flash("Removed");
+      }
+
+      function handleConnect() {
+        if (!settingsUrl.trim() || !settingsKey.trim()) return;
+        setConnecting(true);
+        var client = createClient(settingsUrl.trim(), settingsKey.trim());
+        client.test().then(function(ok) {
+          if (ok) {
+            localStorage.setItem("ab-supabase", JSON.stringify({url: settingsUrl.trim(), key: settingsKey.trim()}));
+            setSupaUrl(settingsUrl.trim());
+            setSupaKey(settingsKey.trim());
+            setShowSettings(false);
+            flash("Connected!");
+          } else { flash("Connection failed"); }
+        }).catch(function() { flash("Connection failed"); }).finally(function() { setConnecting(false); });
+      }
+
+      function handleDisconnect() {
+        localStorage.removeItem("ab-supabase");
+        setSupaUrl(""); setSupaKey(""); setSettingsUrl(""); setSettingsKey("");
+        clientRef.current = null;
+        setSyncStatus("local");
+        setShowSettings(false);
+        flash("Disconnected");
+      }
+
+      var categories = [];
+      var cs = {};
+      books.forEach(function(b) { if (!cs[b.category]) { cs[b.category] = true; categories.push(b.category); }});
+      categories.sort();
+
+      // Filter + Sort
+      var filtered = books.slice();
+      if (search) {
+        var s = search.toLowerCase();
+        filtered = filtered.filter(function(b) { return b.title.toLowerCase().indexOf(s) >= 0 || b.author.toLowerCase().indexOf(s) >= 0; });
+      }
+      if (catF !== "All") filtered = filtered.filter(function(b) { return b.category === catF; });
+      if (ratF !== "All") {
+        if (ratF === "Favs") filtered = filtered.filter(function(b) { return b.fav; });
+        else if (ratF === "Rated") filtered = filtered.filter(function(b) { return b.rating > 0; });
+        else if (ratF === "Unrated") filtered = filtered.filter(function(b) { return b.rating === 0; });
+        else filtered = filtered.filter(function(b) { return b.rating === parseInt(ratF); });
+      }
+      var sp = sort.split("-"); var sk = sp[0]; var sd = sp[1];
+      filtered.sort(function(a, b) {
+        var v = sk === "title" ? a.title.localeCompare(b.title) : sk === "author" ? a.author.localeCompare(b.author) : sk === "category" ? a.category.localeCompare(b.category) : sk === "rating" ? a.rating - b.rating : 0;
+        return sd === "desc" ? -v : v;
+      });
+
+      var rc = books.filter(function(b) { return b.rating > 0; }).length;
+      var avg = rc > 0 ? (books.reduce(function(s, b) { return s + b.rating; }, 0) / rc).toFixed(1) : "\u2014";
+
+      // Share text
+      var shareText = "";
+      (function() {
+        var rated = books.filter(function(b){return b.rating>0;}).sort(function(a,b){return b.rating-a.rating||a.title.localeCompare(b.title);});
+        var unrated = books.filter(function(b){return b.rating===0;}).sort(function(a,b){return a.title.localeCompare(b.title);});
+        shareText = "My Audiobook Library (" + books.length + " books)\n" + rc + " rated, Avg: " + avg + "/5\n\n";
+        if (rated.length) { shareText += "RATED\n"; rated.forEach(function(b) { shareText += "\u2605".repeat(b.rating) + "\u2606".repeat(5-b.rating) + " " + b.title + " - " + b.author + "\n"; }); }
+        if (unrated.length) { shareText += "\nFULL LIST\n"; unrated.forEach(function(b) { shareText += "- " + b.title + " - " + b.author + "\n"; }); }
+      })();
+
+      function handleCopy() { navigator.clipboard.writeText(shareText).then(function(){flash("Copied!");setShowShare(false);}).catch(function(){flash("Copy failed");}); }
+
+      var syncDot = syncStatus === "synced" ? "var(--success)" : syncStatus === "syncing" ? "var(--gold)" : syncStatus === "error" ? "var(--danger)" : "var(--text3)";
+      var syncLabel = syncStatus === "synced" ? "Synced" : syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Error" : "Local only";
+
+      /* MODAL HELPER */
+      function Modal(props) {
+        return E("div", {onMouseDown: function(e){if(e.target===e.currentTarget)props.onClose();}, onTouchEnd: function(e){if(e.target===e.currentTarget)props.onClose();}, style: {position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(4px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}},
+          E("div", {style: {background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",animation:"fadeScale 0.2s",WebkitOverflowScrolling:"touch"}}, props.children)
+        );
+      }
+
+      /* RENDER */
+      return E("div", {style:{minHeight:"100vh",background:"var(--bg)"}},
+        /* Toast */
+        toast ? E("div", {style:{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"var(--bg)",padding:"10px 24px",borderRadius:8,fontWeight:600,fontSize:13,zIndex:9999,animation:"fadeIn 0.25s"}}, toast) : null,
+
+        /* Header */
+        E("header", {style:{background:"linear-gradient(180deg,var(--surface),var(--bg))",borderBottom:"1px solid var(--border)",padding:"24px 16px 16px",position:"sticky",top:0,zIndex:100}},
+          E("div", {style:{maxWidth:800,margin:"0 auto"}},
+            E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},
+              E("div", null,
+                E("h1", {className:"serif",style:{fontSize:24,color:"var(--gold)",fontWeight:600,margin:0}}, "Ben's Library"),
+                E("p", {style:{margin:"3px 0 0",fontSize:11,color:"var(--text3)",fontWeight:300,letterSpacing:0.5}}, books.length + " titles \u00b7 " + rc + " rated \u00b7 avg " + avg + "\u2605")
+              ),
+              E("div", null)
+            ),
+            E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
+            E("div", {style:{marginBottom:8}},
+              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 Ben's Favorites")
+            ),
+            E("div", {style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
+              E("select", {value:sort,onChange:function(e){setSort(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
+                E("option",{value:"title-asc"},"Title A\u2192Z"),E("option",{value:"title-desc"},"Title Z\u2192A"),
+                E("option",{value:"author-asc"},"Author A\u2192Z"),E("option",{value:"author-desc"},"Author Z\u2192A"),
+                E("option",{value:"rating-desc"},"Rating \u2193"),E("option",{value:"rating-asc"},"Rating \u2191"),
+                E("option",{value:"category-asc"},"Category")),
+              E("select", {value:catF,onChange:function(e){setCatF(e.target.value);},style:{maxWidth:160,padding:"6px 10px",fontSize:12}},
+                [E("option",{key:"All",value:"All"},"All Categories")].concat(categories.map(function(c){return E("option",{key:c,value:c},c);}))),
+              E("select", {value:ratF,onChange:function(e){setRatF(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
+                E("option",{value:"All"},"All"),E("option",{value:"Favs"},"\u2764 Favorites"),E("option",{value:"Rated"},"Rated"),E("option",{value:"Unrated"},"Unrated"),
+                [5,4,3,2,1].map(function(n){return E("option",{key:n,value:n},"\u2605".repeat(n));})),
+              E("span", {style:{fontSize:10,color:"var(--text4)"}}, filtered.length + " shown")
+            )
+          )
+        ),
+
+        /* Book List */
+        E("main", {style:{maxWidth:800,margin:"0 auto",padding:"8px 16px 100px"}},
+          filtered.map(function(book) {
+            return E("div", {key:book.id,onClick:function(){setExpanded(expanded===book.id?null:book.id);},style:{borderBottom:"1px solid var(--border)",padding:"14px 0",cursor:"pointer"}},
+              E("div", {style:{display:"flex",gap:12,alignItems:"flex-start"}},
+                E(Cover, {title:book.title,author:book.author,category:book.category}),
+                E("div", {style:{flex:1,minWidth:0}},
+                  E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}},
+                    E("div", {style:{minWidth:0}},
+                      E("div", {className:"serif",style:{fontSize:15,color:"var(--text)",fontWeight:600,lineHeight:1.3}}, book.title),
+                      E("div", {style:{fontSize:12,color:"var(--text2)",marginTop:2,fontWeight:300}}, book.author)
+                    ),
+                    E("div", {style:{flexShrink:0,paddingTop:2,display:"flex",alignItems:"center",gap:6}},
+                      E(Stars, {rating:book.rating}),
+                      E("span", {style:{fontSize:16,color:book.fav?"#C25450":"#5A5545",userSelect:"none"}}, book.fav ? "\u2764" : "\u2661")
+                    )
+                  ),
+                  E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
+                  book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 Ben's Favorite") : null,
+                  expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
+                    loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
+                    descs[book.id] ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : (!loadDesc && book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null)
+                  ) : null
+                )
+              )
+            );
+          }),
+          filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
+        ),
+
+        /* Read-only version - no modals */
+        null
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(E(App));
+  </script>
+</body>
+</html>
