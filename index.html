@@ -465,6 +465,7 @@
       const [showSettings, setShowSettings] = useState(false);
       const [showShare, setShowShare] = useState(false);
       const [newBook, setNewBook] = useState({t:"",a:"",c:"",o:""});
+      const [searching, setSearching] = useState(false);
       const [toast, setToast] = useState("");
       const [syncStatus, setSyncStatus] = useState("local");
       const [supaUrl, setSupaUrl] = useState("https://cfwzrmlygzdsvitjfxze.supabase.co");
@@ -579,6 +580,29 @@
           return updated;
         });
       }, []);
+
+      const handleLookup = useCallback(async () => {
+        if (!newBook.t.trim()) return;
+        setSearching(true);
+        try {
+          const q = encodeURIComponent(newBook.t.trim() + (newBook.a.trim() ? " " + newBook.a.trim() : ""));
+          const resp = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`);
+          const data = await resp.json();
+          const item = data.items?.[0]?.volumeInfo;
+          if (item) {
+            const cats = item.categories || [];
+            const desc = (item.description || "").replace(/<[^>]+>/g, "");
+            setNewBook(prev => ({
+              t: item.title || prev.t,
+              a: item.authors ? item.authors.join(", ") : prev.a,
+              c: cats.length ? cats[0] : prev.c,
+              o: desc ? desc.substring(0, 300) + (desc.length > 300 ? "..." : "") : prev.o
+            }));
+            flash("Book found!");
+          } else { flash("No results found"); }
+        } catch(e) { flash("Lookup failed"); }
+        setSearching(false);
+      }, [newBook.t, newBook.a]);
 
       const handleAdd = useCallback(() => {
         if (!newBook.t.trim() || !newBook.a.trim()) return;
@@ -829,7 +853,12 @@ CREATE POLICY "Allow all" ON books
           React.createElement("div",{className:"modal",onClick:e=>e.stopPropagation()},
             React.createElement("h2",{className:"serif"},"Add a Book"),
             React.createElement("div",{style:{display:"flex",flexDirection:"column",gap:12}},
-              React.createElement("input",{placeholder:"Title *",value:newBook.t,onChange:e=>setNewBook(p=>({...p,t:e.target.value}))}),
+              React.createElement("div",{style:{display:"flex",gap:8}},
+                React.createElement("input",{placeholder:"Type a book title...",value:newBook.t,onChange:e=>setNewBook(p=>({...p,t:e.target.value})),onKeyDown:e=>{if(e.key==="Enter")handleLookup();},style:{flex:1}}),
+                React.createElement("button",{onClick:handleLookup,disabled:searching||!newBook.t.trim(),className:"btn-primary",style:{padding:"10px 16px",fontSize:13,whiteSpace:"nowrap",flexShrink:0}},searching?"\u2022\u2022\u2022":"Search")
+              ),
+              searching && React.createElement("div",{style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13,animation:"fadeIn 0.3s"}},"Looking up book details..."),
+              React.createElement("input",{placeholder:"Author",value:newBook.a,onChange:e=>setNewBook(p=>({...p,a:e.target.value}))}),
               React.createElement("input",{placeholder:"Author *",value:newBook.a,onChange:e=>setNewBook(p=>({...p,a:e.target.value}))}),
               React.createElement("input",{placeholder:"Category (e.g. History / WWII)",value:newBook.c,onChange:e=>setNewBook(p=>({...p,c:e.target.value}))}),
               React.createElement("textarea",{placeholder:"Overview (optional)",value:newBook.o,onChange:e=>setNewBook(p=>({...p,o:e.target.value})),rows:3,style:{resize:"vertical"}}),
