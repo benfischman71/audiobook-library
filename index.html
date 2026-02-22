@@ -459,6 +459,8 @@
       const [catFilter, setCatFilter] = useState("All");
       const [ratingFilter, setRatingFilter] = useState("All");
       const [expanded, setExpanded] = useState(null);
+      const [descriptions, setDescriptions] = useState({});
+      const [loadingDesc, setLoadingDesc] = useState(null);
       const [showAdd, setShowAdd] = useState(false);
       const [showSettings, setShowSettings] = useState(false);
       const [showShare, setShowShare] = useState(false);
@@ -548,6 +550,25 @@
       }
 
       const flash = (m) => { setToast(m); setTimeout(()=>setToast(""),2200); };
+
+      // Fetch longer description from Google Books API when a book is expanded
+      useEffect(() => {
+        if (!expanded) return;
+        const book = books.find(b => b.id === expanded);
+        if (!book || descriptions[expanded]) return;
+        setLoadingDesc(expanded);
+        const query = encodeURIComponent(`intitle:${book.title} inauthor:${book.author}`);
+        fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`)
+          .then(r => r.json())
+          .then(data => {
+            const item = data.items?.[0]?.volumeInfo;
+            if (item?.description) {
+              setDescriptions(prev => ({...prev, [expanded]: item.description.replace(/<[^>]+>/g, '')}));
+            }
+          })
+          .catch(() => {})
+          .finally(() => setLoadingDesc(null));
+      }, [expanded]);
 
       const handleRate = useCallback((id, r) => {
         setBooks(prev => {
@@ -743,6 +764,8 @@
                   React.createElement("span",{style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:400,textTransform:"uppercase"}},book.category),
                   expanded===book.id && React.createElement("div",{style:{animation:"fadeIn 0.2s"}},
                     book.overview && React.createElement("p",{style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}},book.overview),
+                    loadingDesc===book.id && React.createElement("p",{style:{margin:"8px 0",fontSize:12,color:"var(--text4)"}},"\u2022\u2022\u2022 Loading details..."),
+                    descriptions[book.id] && React.createElement("p",{style:{margin:"8px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}},descriptions[book.id]),
                     React.createElement("button",{onClick:e=>{e.stopPropagation();handleDelete(book.id);},style:{
                       background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",
                       borderRadius:6,padding:"4px 12px",fontSize:11,marginTop:4,opacity:0.7
@@ -837,4 +860,3 @@ CREATE POLICY "Allow all" ON books
   </script>
 </body>
 </html>
-
