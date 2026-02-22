@@ -434,50 +434,44 @@
 
     /* ADD BOOK FORM - isolated component, no parent re-renders */
     function AddBookForm(props) {
-      var tRef = useRef(null);
-      var aRef = useRef(null);
-      var cRef = useRef(null);
-      var oRef = useRef(null);
+      var tState = useState(""); var t = tState[0]; var setT = tState[1];
+      var aState = useState(""); var a = aState[0]; var setA = aState[1];
+      var cState = useState(""); var c = cState[0]; var setC = cState[1];
+      var oState = useState(""); var o = oState[0]; var setO = oState[1];
       var busyState = useState(false); var busy = busyState[0]; var setBusy = busyState[1];
       var msgState = useState(""); var msg = msgState[0]; var setMsg = msgState[1];
 
       function doSearch() {
-        var t = tRef.current ? tRef.current.value : "";
-        var a = aRef.current ? aRef.current.value : "";
         if (!t.trim()) return;
         setBusy(true);
         setMsg("Looking up...");
         lookupBook(t, a).then(function(result) {
           if (result) {
-            if (tRef.current && result.title) tRef.current.value = result.title;
-            if (aRef.current && result.author) aRef.current.value = result.author;
-            if (cRef.current && result.category) cRef.current.value = result.category;
-            if (oRef.current && result.overview) oRef.current.value = result.overview;
+            if (result.title) setT(result.title);
+            if (result.author) setA(result.author);
+            if (result.category) setC(result.category);
+            if (result.overview) setO(result.overview);
             setMsg("Book found!");
           } else { setMsg("No results found"); }
         }).catch(function() { setMsg("Lookup failed"); }).finally(function() { setBusy(false); setTimeout(function(){setMsg("");}, 2000); });
       }
 
       function doAdd() {
-        var t = tRef.current ? tRef.current.value.trim() : "";
-        var a = aRef.current ? aRef.current.value.trim() : "";
-        var c = cRef.current ? cRef.current.value.trim() : "";
-        var o = oRef.current ? oRef.current.value.trim() : "";
-        if (!t || !a) { setMsg("Title and author required"); setTimeout(function(){setMsg("");}, 2000); return; }
-        props.onAdd({id: "c" + Date.now(), title: t, author: a, category: c || "Uncategorized", overview: o, rating: 0, fav: false, custom: true});
+        if (!t.trim() || !a.trim()) { setMsg("Title and author required"); setTimeout(function(){setMsg("");}, 2000); return; }
+        props.onAdd({id: "c" + Date.now(), title: t.trim(), author: a.trim(), category: c.trim() || "Uncategorized", overview: o.trim(), rating: 0, fav: false, custom: true});
       }
 
       return E("div", null,
         E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
         E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
           E("div", {style:{display:"flex",gap:8}},
-            E("input", {ref:tRef,placeholder:"Type a book title...",defaultValue:"",onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();doSearch();}},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
+            E("input", {placeholder:"Type a book title...",value:t,onChange:function(e){setT(e.target.value);},onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();doSearch();}},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
             E("button", {onClick:doSearch,disabled:busy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:busy?0.4:1}}, busy ? "..." : "Search")
           ),
-          E("div", {style:{textAlign:"center",padding:msg?6:0,color:"var(--gold)",fontSize:13,height:msg?"auto":0,overflow:"hidden"}}, msg || ""),
-          E("input", {ref:aRef,placeholder:"Author",defaultValue:"",autoComplete:"off"}),
-          E("input", {ref:cRef,placeholder:"Category (e.g. History / WWII)",defaultValue:"",autoComplete:"off"}),
-          E("textarea", {ref:oRef,placeholder:"Overview",defaultValue:"",rows:3,style:{resize:"vertical"}}),
+          msg ? E("div", {style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13}}, msg) : null,
+          E("input", {placeholder:"Author",value:a,onChange:function(e){setA(e.target.value);},autoComplete:"off"}),
+          E("input", {placeholder:"Category (e.g. History / WWII)",value:c,onChange:function(e){setC(e.target.value);},autoComplete:"off"}),
+          E("textarea", {placeholder:"Overview",value:o,onChange:function(e){setO(e.target.value);},rows:3,style:{resize:"vertical"}}),
           E("div", {style:{display:"flex",gap:8,marginTop:4}},
             E("button", {onClick:doAdd,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Add to Library"),
             E("button", {onClick:props.onClose,style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
@@ -745,6 +739,9 @@
               )
             ),
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
+            E("div", {style:{marginBottom:8}},
+              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 Ben's Favorites")
+            ),
             E("div", {style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
               E("select", {value:sort,onChange:function(e){setSort(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
                 E("option",{value:"title-asc"},"Title A\u2192Z"),E("option",{value:"title-desc"},"Title Z\u2192A"),
