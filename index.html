@@ -609,8 +609,8 @@
 
       /* MODAL HELPER */
       function Modal(props) {
-        return E("div", {onClick: props.onClose, style: {position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(4px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}},
-          E("div", {onClick: function(e){e.stopPropagation();}, style: {background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",animation:"fadeScale 0.2s"}}, props.children)
+        return E("div", {onMouseDown: function(e){if(e.target===e.currentTarget)props.onClose();}, onTouchEnd: function(e){if(e.target===e.currentTarget)props.onClose();}, style: {position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(4px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}},
+          E("div", {style: {background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",animation:"fadeScale 0.2s",WebkitOverflowScrolling:"touch"}}, props.children)
         );
       }
 
@@ -705,13 +705,13 @@
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
           E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
             E("div", {style:{display:"flex",gap:8}},
-              E("input", {placeholder:"Type a book title...",value:nb.t,onChange:function(e){setNb(function(p){return Object.assign({},p,{t:e.target.value});});},onKeyDown:function(e){if(e.key==="Enter")handleLookup();},style:{flex:1}}),
+              E("input", {placeholder:"Type a book title...",value:nb.t,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{t:v});});},onKeyDown:function(e){if(e.key==="Enter")handleLookup();},style:{flex:1},autoComplete:"off",autoCorrect:"off"}),
               E("button", {onClick:handleLookup,disabled:searching||!nb.t.trim(),style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:searching||!nb.t.trim()?0.4:1}}, searching ? "..." : "Search")
             ),
             searching ? E("div", {style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13}}, "Looking up book details...") : null,
-            E("input", {placeholder:"Author",value:nb.a,onChange:function(e){setNb(function(p){return Object.assign({},p,{a:e.target.value});});}}),
-            E("input", {placeholder:"Category (e.g. History / WWII)",value:nb.c,onChange:function(e){setNb(function(p){return Object.assign({},p,{c:e.target.value});});}}),
-            E("textarea", {placeholder:"Overview",value:nb.o,onChange:function(e){setNb(function(p){return Object.assign({},p,{o:e.target.value});});},rows:3,style:{resize:"vertical"}}),
+            E("input", {placeholder:"Author",value:nb.a,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{a:v});});},autoComplete:"off"}),
+            E("input", {placeholder:"Category (e.g. History / WWII)",value:nb.c,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{c:v});});},autoComplete:"off"}),
+            E("textarea", {placeholder:"Overview",value:nb.o,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{o:v});});},rows:3,style:{resize:"vertical"}}),
             E("div", {style:{display:"flex",gap:8,marginTop:4}},
               E("button", {onClick:handleAdd,disabled:!nb.t||!nb.a,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600,opacity:nb.t&&nb.a?1:0.4}}, "Add to Library"),
               E("button", {onClick:function(){setShowAdd(false);},style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
