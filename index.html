@@ -432,6 +432,60 @@
         });
     }
 
+    /* ADD BOOK FORM - isolated component, no parent re-renders */
+    function AddBookForm(props) {
+      var tRef = useRef(null);
+      var aRef = useRef(null);
+      var cRef = useRef(null);
+      var oRef = useRef(null);
+      var busyState = useState(false); var busy = busyState[0]; var setBusy = busyState[1];
+      var msgState = useState(""); var msg = msgState[0]; var setMsg = msgState[1];
+
+      function doSearch() {
+        var t = tRef.current ? tRef.current.value : "";
+        var a = aRef.current ? aRef.current.value : "";
+        if (!t.trim()) return;
+        setBusy(true);
+        setMsg("Looking up...");
+        lookupBook(t, a).then(function(result) {
+          if (result) {
+            if (tRef.current && result.title) tRef.current.value = result.title;
+            if (aRef.current && result.author) aRef.current.value = result.author;
+            if (cRef.current && result.category) cRef.current.value = result.category;
+            if (oRef.current && result.overview) oRef.current.value = result.overview;
+            setMsg("Book found!");
+          } else { setMsg("No results found"); }
+        }).catch(function() { setMsg("Lookup failed"); }).finally(function() { setBusy(false); setTimeout(function(){setMsg("");}, 2000); });
+      }
+
+      function doAdd() {
+        var t = tRef.current ? tRef.current.value.trim() : "";
+        var a = aRef.current ? aRef.current.value.trim() : "";
+        var c = cRef.current ? cRef.current.value.trim() : "";
+        var o = oRef.current ? oRef.current.value.trim() : "";
+        if (!t || !a) { setMsg("Title and author required"); setTimeout(function(){setMsg("");}, 2000); return; }
+        props.onAdd({id: "c" + Date.now(), title: t, author: a, category: c || "Uncategorized", overview: o, rating: 0, fav: false, custom: true});
+      }
+
+      return E("div", null,
+        E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
+        E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
+          E("div", {style:{display:"flex",gap:8}},
+            E("input", {ref:tRef,placeholder:"Type a book title...",defaultValue:"",onKeyDown:function(e){if(e.key==="Enter"){e.preventDefault();doSearch();}},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
+            E("button", {onClick:doSearch,disabled:busy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:busy?0.4:1}}, busy ? "..." : "Search")
+          ),
+          E("div", {style:{textAlign:"center",padding:msg?6:0,color:"var(--gold)",fontSize:13,height:msg?"auto":0,overflow:"hidden"}}, msg || ""),
+          E("input", {ref:aRef,placeholder:"Author",defaultValue:"",autoComplete:"off"}),
+          E("input", {ref:cRef,placeholder:"Category (e.g. History / WWII)",defaultValue:"",autoComplete:"off"}),
+          E("textarea", {ref:oRef,placeholder:"Overview",defaultValue:"",rows:3,style:{resize:"vertical"}}),
+          E("div", {style:{display:"flex",gap:8,marginTop:4}},
+            E("button", {onClick:doAdd,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Add to Library"),
+            E("button", {onClick:props.onClose,style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
+          )
+        )
+      );
+    }
+
     /* MAIN APP */
     function App() {
       var booksState = useState(BOOKS); var books = booksState[0]; var setBooks = booksState[1];
@@ -443,15 +497,11 @@
       var showAddState = useState(false); var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
       var showShareState = useState(false); var showShare = showShareState[0]; var setShowShare = showShareState[1];
       var showSettingsState = useState(false); var showSettings = showSettingsState[0]; var setShowSettings = showSettingsState[1];
-      var nbRef = useRef({t:"",a:"",c:"",o:""});
-      var titleRef = useRef(null);
-      var authorRef = useRef(null);
-      var catRef2 = useRef(null);
-      var overRef = useRef(null);
+      var addKeyState = useState(0); var addKey = addKeyState[0]; var setAddKey = addKeyState[1];
       var toastState = useState(""); var toast = toastState[0]; var setToast = toastState[1];
       var descState = useState({}); var descs = descState[0]; var setDescs = descState[1];
       var loadDescState = useState(null); var loadDesc = loadDescState[0]; var setLoadDesc = loadDescState[1];
-      var searchingState = useState(false); var searching = searchingState[0]; var setSearching = searchingState[1];
+      
       var syncState = useState("local"); var syncStatus = syncState[0]; var setSyncStatus = syncState[1];
       var supaUrlState = useState("https://cfwzrmlygzdsvitjfxze.supabase.co"); var supaUrl = supaUrlState[0]; var setSupaUrl = supaUrlState[1];
       var supaKeyState = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc"); var supaKey = supaKeyState[0]; var setSupaKey = supaKeyState[1];
@@ -578,40 +628,15 @@
       }, [expanded]);
 
       // Search for book when adding
-      function handleLookup() {
-        var t = titleRef.current ? titleRef.current.value : "";
-        var a = authorRef.current ? authorRef.current.value : "";
-        if (!t.trim()) return;
-        setSearching(true);
-        lookupBook(t, a).then(function(result) {
-          if (result) {
-            if (titleRef.current) titleRef.current.value = result.title || t;
-            if (authorRef.current) authorRef.current.value = result.author || a;
-            if (catRef2.current) catRef2.current.value = result.category || "";
-            if (overRef.current) overRef.current.value = result.overview || "";
-            nbRef.current = {t: result.title || t, a: result.author || a, c: result.category || "", o: result.overview || ""};
-            flash("Book found!");
-          } else {
-            flash("No results found");
-          }
-        }).catch(function() { flash("Lookup failed"); }).finally(function() { setSearching(false); });
-      }
-
-      function handleAdd() {
-        var t = titleRef.current ? titleRef.current.value : "";
-        var a = authorRef.current ? authorRef.current.value : "";
-        var c = catRef2.current ? catRef2.current.value : "";
-        var o = overRef.current ? overRef.current.value : "";
-        if (!t.trim() || !a.trim()) return;
-        var book = {id: "c" + Date.now(), title: t, author: a, category: c || "Uncategorized", overview: o, rating: 0, fav: false, custom: true};
+      function onBookAdded(book) {
         setBooks(function(prev) {
           var u = prev.concat([book]);
           saveLocal(u);
           pushCloud([book]);
           return u;
         });
-        nbRef.current = {t:"",a:"",c:"",o:""};
         setShowAdd(false);
+        setAddKey(function(k) { return k + 1; });
         flash("Book added!");
       }
 
@@ -790,21 +815,7 @@
 
         /* Add Modal */
         showAdd ? E(Modal, {onClose:function(){setShowAdd(false);}},
-          E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
-          E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
-            E("div", {style:{display:"flex",gap:8}},
-              E("input", {ref:titleRef,key:"add-title",placeholder:"Type a book title...",defaultValue:"",onKeyDown:function(e){if(e.key==="Enter")handleLookup();},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
-              E("button", {onClick:handleLookup,disabled:searching,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:searching?0.4:1}}, searching ? "..." : "Search")
-            ),
-            searching ? E("div", {style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13}}, "Looking up book details...") : null,
-            E("input", {ref:authorRef,key:"add-author",placeholder:"Author",defaultValue:"",autoComplete:"off"}),
-            E("input", {ref:catRef2,key:"add-cat",placeholder:"Category (e.g. History / WWII)",defaultValue:"",autoComplete:"off"}),
-            E("textarea", {ref:overRef,key:"add-over",placeholder:"Overview",defaultValue:"",rows:3,style:{resize:"vertical"}}),
-            E("div", {style:{display:"flex",gap:8,marginTop:4}},
-              E("button", {onClick:handleAdd,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Add to Library"),
-              E("button", {onClick:function(){setShowAdd(false);},style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
-            )
-          )
+          E(AddBookForm, {key:addKey, onAdd:onBookAdded, onClose:function(){setShowAdd(false);}})
         ) : null,
 
         /* Share Modal */
