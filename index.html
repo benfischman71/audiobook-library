@@ -396,7 +396,7 @@
       return E("span", {style:{whiteSpace:"nowrap"}},
         [1,2,3,4,5].map(function(i) {
           return E("span", {key: i, onClick: function(e) { e.stopPropagation(); if (props.onRate) props.onRate(i === props.rating ? 0 : i); },
-            style: {fontSize:16,color:i<=props.rating?"#C9A84C":"#2E2B23",cursor:"pointer",padding:"0 1px",userSelect:"none",transition:"color 0.15s"}
+            style: {fontSize:16,color:i<=props.rating?"#C9A84C":"#5A5545",cursor:"pointer",padding:"0 1px",userSelect:"none",transition:"color 0.15s"}
           }, i <= props.rating ? "\u2605" : "\u2606");
         })
       );
@@ -561,11 +561,16 @@
         var book = books.find(function(b) { return b.id === expanded; });
         if (!book || descs[expanded]) return;
         setLoadDesc(expanded);
-        lookupBook(book.title, book.author).then(function(result) {
-          if (result && result.overview) {
-            setDescs(function(prev) { var n = Object.assign({}, prev); n[expanded] = result.overview; return n; });
-          }
-        }).catch(function(){}).finally(function() { setLoadDesc(null); });
+        var q = encodeURIComponent(book.title + " " + book.author);
+        fetch("https://www.googleapis.com/books/v1/volumes?q=" + q + "&maxResults=1")
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var item = data.items && data.items[0] && data.items[0].volumeInfo;
+            if (item && item.description) {
+              var desc = item.description.replace(/<[^>]*>/g, "");
+              setDescs(function(prev) { var n = Object.assign({}, prev); n[expanded] = desc; return n; });
+            }
+          }).catch(function(){}).finally(function() { setLoadDesc(null); });
       }, [expanded]);
 
       // Search for book when adding
@@ -731,15 +736,14 @@
                     ),
                     E("div", {style:{flexShrink:0,paddingTop:2,display:"flex",alignItems:"center",gap:6}},
                       E(Stars, {rating:book.rating,onRate:function(r){handleRate(book.id,r);}}),
-                      E("span", {onClick:function(e){e.stopPropagation();handleFav(book.id);},style:{fontSize:16,cursor:"pointer",color:book.fav?"#C25450":"#2E2B23",transition:"color 0.15s",userSelect:"none"}}, book.fav ? "\u2764" : "\u2661")
+                      E("span", {onClick:function(e){e.stopPropagation();handleFav(book.id);},style:{fontSize:16,cursor:"pointer",color:book.fav?"#C25450":"#5A5545",transition:"color 0.15s",userSelect:"none"}}, book.fav ? "\u2764" : "\u2661")
                     )
                   ),
                   E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
                   book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 Ben's Favorite") : null,
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
-                    book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null,
-                    loadDesc === book.id ? E("p", {style:{margin:"8px 0",fontSize:12,color:"var(--text4)"}}, "Loading details...") : null,
-                    descs[book.id] ? E("p", {style:{margin:"8px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : null,
+                    loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
+                    descs[book.id] ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : (!loadDesc && book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null),
                     E("button", {onClick:function(e){e.stopPropagation();handleDelete(book.id);},style:{background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:6,padding:"4px 12px",fontSize:11,marginTop:4,opacity:0.7}}, "Remove")
                   ) : null
                 )
