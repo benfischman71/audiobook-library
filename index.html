@@ -312,7 +312,7 @@
 ["The Boys in the Light","Nina Willner","History / Cold War","Explores the lives of young people caught between East and West during the Cold War."]];
 
     var BOOKS = D.map(function(r, i) {
-      return {id: "b" + i, title: r[0], author: r[1], category: r[2], overview: r[3], rating: 0};
+      return {id: "b" + i, title: r[0], author: r[1], category: r[2], overview: r[3], rating: 0, fav: false};
     });
 
     var CATS = [];
@@ -326,7 +326,49 @@
     function hsh(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
 
     /* COVER */
+    /* COVER CACHE */
+    var _coverCache = {};
+    try { var _cc = localStorage.getItem("ab-covers"); if (_cc) _coverCache = JSON.parse(_cc); } catch(e) {}
+    var _coverQueue = [];
+    var _coverFetching = false;
+
+    function _fetchNextCover() {
+      if (_coverFetching || _coverQueue.length === 0) return;
+      _coverFetching = true;
+      var item = _coverQueue.shift();
+      var q = encodeURIComponent(item.title + " " + item.author);
+      fetch("https://www.googleapis.com/books/v1/volumes?q=" + q + "&maxResults=1")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var thumb = data.items && data.items[0] && data.items[0].volumeInfo && data.items[0].volumeInfo.imageLinks;
+          var url = thumb ? (thumb.thumbnail || thumb.smallThumbnail || "") : "";
+          if (url) url = url.replace("http://", "https://");
+          _coverCache[item.key] = url || "none";
+          try { localStorage.setItem("ab-covers", JSON.stringify(_coverCache)); } catch(e) {}
+          if (item.cb) item.cb(url);
+        })
+        .catch(function() { _coverCache[item.key] = "none"; if (item.cb) item.cb(""); })
+        .finally(function() { _coverFetching = false; setTimeout(_fetchNextCover, 150); });
+    }
+
+    function requestCover(title, author, cb) {
+      var key = title + "|" + author;
+      if (_coverCache[key]) { cb(_coverCache[key] === "none" ? "" : _coverCache[key]); return; }
+      _coverQueue.push({key: key, title: title, author: author, cb: cb});
+      _fetchNextCover();
+    }
+
     function Cover(props) {
+      var imgState = useState(null);
+      var img = imgState[0]; var setImg = imgState[1];
+      var failedState = useState(false);
+      var failed = failedState[0]; var setFailed = failedState[1];
+
+      useEffect(function() {
+        requestCover(props.title, props.author, function(url) { if (url) setImg(url); else setFailed(true); });
+      }, [props.title, props.author]);
+
+      // Generated fallback
       var hs = getHue(props.category);
       var h = hs.h, s = hs.s;
       var v = hsh(props.title + props.author);
@@ -334,6 +376,13 @@
       var disp = w.slice(0, 3).join(" ");
       var stripe = v % 3 !== 0;
       var sp = 10 + (v % 28);
+
+      if (img && !failed) {
+        return E("div", {style:{width:52,height:76,borderRadius:"3px 5px 5px 3px",overflow:"hidden",flexShrink:0,boxShadow:"3px 2px 8px rgba(0,0,0,0.4)",background:"var(--surface)"}},
+          E("img", {src: img, style:{width:"100%",height:"100%",objectFit:"cover"}, onError: function(){setFailed(true);}})
+        );
+      }
+
       return E("div", {style: {width:52,height:76,borderRadius:"3px 5px 5px 3px",overflow:"hidden",flexShrink:0,background:"linear-gradient(155deg,hsl("+h+","+s+"%,14%),hsl("+h+","+(s-5)+"%,9%))",border:"1px solid hsl("+h+","+s+"%,22%)",boxShadow:"3px 2px 8px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"8px 5px",position:"relative",boxSizing:"border-box"}},
         E("div", {style: {position:"absolute",left:0,top:0,bottom:0,width:3,background:"linear-gradient(180deg,hsl("+h+","+(s+10)+"%,40%),hsl("+h+","+s+"%,25%))"}}),
         stripe ? E("div", {style: {position:"absolute",left:4,right:4,top:sp,height:1,background:"hsl("+h+","+s+"%,25%)"}}) : null,
@@ -415,9 +464,14 @@
         if (saved) {
           try {
             var d = JSON.parse(saved);
-            if (d.ratings) {
+            if (d.ratings || d.favs) {
               setBooks(function(prev) {
-                return prev.map(function(b) { return d.ratings[b.title] ? Object.assign({}, b, {rating: d.ratings[b.title]}) : b; });
+                return prev.map(function(b) {
+                  var updates = {};
+                  if (d.ratings && d.ratings[b.title]) updates.rating = d.ratings[b.title];
+                  if (d.favs && d.favs[b.title]) updates.fav = true;
+                  return Object.keys(updates).length ? Object.assign({}, b, updates) : b;
+                });
               });
             }
             if (d.custom && d.custom.length) {
@@ -467,9 +521,10 @@
 
       function saveLocal(updated) {
         var ratings = {};
-        updated.forEach(function(b) { if (b.rating > 0) ratings[b.title] = b.rating; });
+        var favs = {};
+        updated.forEach(function(b) { if (b.rating > 0) ratings[b.title] = b.rating; if (b.fav) favs[b.title] = true; });
         var custom = updated.filter(function(b) { return b.custom; });
-        localStorage.setItem("ab-lib-data", JSON.stringify({ratings: ratings, custom: custom}));
+        localStorage.setItem("ab-lib-data", JSON.stringify({ratings: ratings, favs: favs, custom: custom}));
       }
 
       function pushCloud(items) {
@@ -483,6 +538,16 @@
       function handleRate(id, r) {
         setBooks(function(prev) {
           var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {rating: r}) : b; });
+          saveLocal(u);
+          var changed = u.find(function(b) { return b.id === id; });
+          if (changed) pushCloud([changed]);
+          return u;
+        });
+      }
+
+      function handleFav(id) {
+        setBooks(function(prev) {
+          var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {fav: !b.fav}) : b; });
           saveLocal(u);
           var changed = u.find(function(b) { return b.id === id; });
           if (changed) pushCloud([changed]);
@@ -519,7 +584,7 @@
 
       function handleAdd() {
         if (!nb.t.trim() || !nb.a.trim()) return;
-        var book = {id: "c" + Date.now(), title: nb.t, author: nb.a, category: nb.c || "Uncategorized", overview: nb.o, rating: 0, custom: true};
+        var book = {id: "c" + Date.now(), title: nb.t, author: nb.a, category: nb.c || "Uncategorized", overview: nb.o, rating: 0, fav: false, custom: true};
         setBooks(function(prev) {
           var u = prev.concat([book]);
           saveLocal(u);
@@ -579,7 +644,8 @@
       }
       if (catF !== "All") filtered = filtered.filter(function(b) { return b.category === catF; });
       if (ratF !== "All") {
-        if (ratF === "Rated") filtered = filtered.filter(function(b) { return b.rating > 0; });
+        if (ratF === "Favs") filtered = filtered.filter(function(b) { return b.fav; });
+        else if (ratF === "Rated") filtered = filtered.filter(function(b) { return b.rating > 0; });
         else if (ratF === "Unrated") filtered = filtered.filter(function(b) { return b.rating === 0; });
         else filtered = filtered.filter(function(b) { return b.rating === parseInt(ratF); });
       }
@@ -644,7 +710,7 @@
               E("select", {value:catF,onChange:function(e){setCatF(e.target.value);},style:{maxWidth:160,padding:"6px 10px",fontSize:12}},
                 [E("option",{key:"All",value:"All"},"All Categories")].concat(categories.map(function(c){return E("option",{key:c,value:c},c);}))),
               E("select", {value:ratF,onChange:function(e){setRatF(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
-                E("option",{value:"All"},"All"),E("option",{value:"Rated"},"Rated"),E("option",{value:"Unrated"},"Unrated"),
+                E("option",{value:"All"},"All"),E("option",{value:"Favs"},"\u2764 Favorites"),E("option",{value:"Rated"},"Rated"),E("option",{value:"Unrated"},"Unrated"),
                 [5,4,3,2,1].map(function(n){return E("option",{key:n,value:n},"\u2605".repeat(n));})),
               E("span", {style:{fontSize:10,color:"var(--text4)"}}, filtered.length + " shown")
             )
@@ -663,9 +729,13 @@
                       E("div", {className:"serif",style:{fontSize:15,color:"var(--text)",fontWeight:600,lineHeight:1.3}}, book.title),
                       E("div", {style:{fontSize:12,color:"var(--text2)",marginTop:2,fontWeight:300}}, book.author)
                     ),
-                    E("div", {style:{flexShrink:0,paddingTop:2}}, E(Stars, {rating:book.rating,onRate:function(r){handleRate(book.id,r);}}))
+                    E("div", {style:{flexShrink:0,paddingTop:2,display:"flex",alignItems:"center",gap:6}},
+                      E(Stars, {rating:book.rating,onRate:function(r){handleRate(book.id,r);}}),
+                      E("span", {onClick:function(e){e.stopPropagation();handleFav(book.id);},style:{fontSize:16,cursor:"pointer",color:book.fav?"#C25450":"#2E2B23",transition:"color 0.15s",userSelect:"none"}}, book.fav ? "\u2764" : "\u2661")
+                    )
                   ),
                   E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
+                  book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 Ben's Favorite") : null,
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
                     book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null,
                     loadDesc === book.id ? E("p", {style:{margin:"8px 0",fontSize:12,color:"var(--text4)"}}, "Loading details...") : null,
