@@ -443,7 +443,11 @@
       var showAddState = useState(false); var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
       var showShareState = useState(false); var showShare = showShareState[0]; var setShowShare = showShareState[1];
       var showSettingsState = useState(false); var showSettings = showSettingsState[0]; var setShowSettings = showSettingsState[1];
-      var nbState = useState({t:"",a:"",c:"",o:""}); var nb = nbState[0]; var setNb = nbState[1];
+      var nbRef = useRef({t:"",a:"",c:"",o:""});
+      var titleRef = useRef(null);
+      var authorRef = useRef(null);
+      var catRef2 = useRef(null);
+      var overRef = useRef(null);
       var toastState = useState(""); var toast = toastState[0]; var setToast = toastState[1];
       var descState = useState({}); var descs = descState[0]; var setDescs = descState[1];
       var loadDescState = useState(null); var loadDesc = loadDescState[0]; var setLoadDesc = loadDescState[1];
@@ -575,11 +579,17 @@
 
       // Search for book when adding
       function handleLookup() {
-        if (!nb.t.trim()) return;
+        var t = titleRef.current ? titleRef.current.value : "";
+        var a = authorRef.current ? authorRef.current.value : "";
+        if (!t.trim()) return;
         setSearching(true);
-        lookupBook(nb.t, nb.a).then(function(result) {
+        lookupBook(t, a).then(function(result) {
           if (result) {
-            setNb({t: result.title || nb.t, a: result.author || nb.a, c: result.category || nb.c, o: result.overview || nb.o});
+            if (titleRef.current) titleRef.current.value = result.title || t;
+            if (authorRef.current) authorRef.current.value = result.author || a;
+            if (catRef2.current) catRef2.current.value = result.category || "";
+            if (overRef.current) overRef.current.value = result.overview || "";
+            nbRef.current = {t: result.title || t, a: result.author || a, c: result.category || "", o: result.overview || ""};
             flash("Book found!");
           } else {
             flash("No results found");
@@ -588,15 +598,19 @@
       }
 
       function handleAdd() {
-        if (!nb.t.trim() || !nb.a.trim()) return;
-        var book = {id: "c" + Date.now(), title: nb.t, author: nb.a, category: nb.c || "Uncategorized", overview: nb.o, rating: 0, fav: false, custom: true};
+        var t = titleRef.current ? titleRef.current.value : "";
+        var a = authorRef.current ? authorRef.current.value : "";
+        var c = catRef2.current ? catRef2.current.value : "";
+        var o = overRef.current ? overRef.current.value : "";
+        if (!t.trim() || !a.trim()) return;
+        var book = {id: "c" + Date.now(), title: t, author: a, category: c || "Uncategorized", overview: o, rating: 0, fav: false, custom: true};
         setBooks(function(prev) {
           var u = prev.concat([book]);
           saveLocal(u);
           pushCloud([book]);
           return u;
         });
-        setNb({t:"",a:"",c:"",o:""});
+        nbRef.current = {t:"",a:"",c:"",o:""};
         setShowAdd(false);
         flash("Book added!");
       }
@@ -779,15 +793,15 @@
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Add a Book"),
           E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
             E("div", {style:{display:"flex",gap:8}},
-              E("input", {placeholder:"Type a book title...",value:nb.t,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{t:v});});},onKeyDown:function(e){if(e.key==="Enter")handleLookup();},style:{flex:1},autoComplete:"off",autoCorrect:"off"}),
-              E("button", {onClick:handleLookup,disabled:searching||!nb.t.trim(),style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:searching||!nb.t.trim()?0.4:1}}, searching ? "..." : "Search")
+              E("input", {ref:titleRef,key:"add-title",placeholder:"Type a book title...",defaultValue:"",onKeyDown:function(e){if(e.key==="Enter")handleLookup();},style:{flex:1},autoComplete:"off",autoCorrect:"off",autoCapitalize:"off",spellCheck:"false"}),
+              E("button", {onClick:handleLookup,disabled:searching,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,opacity:searching?0.4:1}}, searching ? "..." : "Search")
             ),
             searching ? E("div", {style:{textAlign:"center",padding:6,color:"var(--gold)",fontSize:13}}, "Looking up book details...") : null,
-            E("input", {placeholder:"Author",value:nb.a,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{a:v});});},autoComplete:"off"}),
-            E("input", {placeholder:"Category (e.g. History / WWII)",value:nb.c,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{c:v});});},autoComplete:"off"}),
-            E("textarea", {placeholder:"Overview",value:nb.o,onChange:function(e){var v=e.target.value;setNb(function(p){return Object.assign({},p,{o:v});});},rows:3,style:{resize:"vertical"}}),
+            E("input", {ref:authorRef,key:"add-author",placeholder:"Author",defaultValue:"",autoComplete:"off"}),
+            E("input", {ref:catRef2,key:"add-cat",placeholder:"Category (e.g. History / WWII)",defaultValue:"",autoComplete:"off"}),
+            E("textarea", {ref:overRef,key:"add-over",placeholder:"Overview",defaultValue:"",rows:3,style:{resize:"vertical"}}),
             E("div", {style:{display:"flex",gap:8,marginTop:4}},
-              E("button", {onClick:handleAdd,disabled:!nb.t||!nb.a,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600,opacity:nb.t&&nb.a?1:0.4}}, "Add to Library"),
+              E("button", {onClick:handleAdd,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Add to Library"),
               E("button", {onClick:function(){setShowAdd(false);},style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Cancel")
             )
           )
