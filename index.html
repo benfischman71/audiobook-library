@@ -1115,11 +1115,50 @@
 
         /* Share Modal */
         showShare ? E(Modal, {onClose:function(){setShowShare(false);}},
-          E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:16}}, "Share Library"),
-          E("pre", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:16,fontSize:10,lineHeight:1.6,color:"var(--text2)",whiteSpace:"pre-wrap",maxHeight:400,overflow:"auto",fontFamily:"monospace"}}, shareText),
-          E("div", {style:{display:"flex",gap:8,marginTop:16}},
-            E("button", {onClick:handleCopy,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600}}, "Copy to Clipboard"),
-            E("button", {onClick:function(){setShowShare(false);},style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Close")
+          E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Share"),
+          E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
+
+            /* Option 1: Share My Library (read-only) */
+            E("div", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:10,padding:16}},
+              E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+                E("div", null,
+                  E("div", {style:{fontSize:15,color:"var(--text)",fontWeight:600}}, "\uD83D\uDCDA Share My Library"),
+                  E("div", {style:{fontSize:12,color:"var(--text3)",marginTop:4}}, "Friends can browse your rated books in read-only mode")
+                )
+              ),
+              E("div", {style:{display:"flex",gap:8,marginTop:12}},
+                E("button", {onClick:function(){
+                  if (navigator.share) {
+                    navigator.share({title: userName + "'s Library", text: shareText.substring(0, 500) + "\n\nSee the full list:", url: "https://benfischman71.github.io/audiobook-library/share.html"}).catch(function(){});
+                  } else {
+                    navigator.clipboard.writeText(shareText).then(function(){flash("Library copied!");}).catch(function(){flash("Copy failed");});
+                  }
+                },style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600}}, navigator.share ? "Share Library" : "Copy Library List"),
+                E("button", {onClick:function(){
+                  navigator.clipboard.writeText(shareText).then(function(){flash("List copied!");}).catch(function(){flash("Copy failed");});
+                },style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"10px 16px",fontSize:13}}, "Copy as Text")
+              )
+            ),
+
+            /* Option 2: Invite to Build Their Own */
+            E("div", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:10,padding:16}},
+              E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
+                E("div", null,
+                  E("div", {style:{fontSize:15,color:"var(--text)",fontWeight:600}}, "\u2728 Invite a Friend"),
+                  E("div", {style:{fontSize:12,color:"var(--text3)",marginTop:4}}, "They can create their own personal library")
+                )
+              ),
+              E("button", {onClick:function(){
+                var inviteMsg = "Check out My Personal Library \u2014 track your books, rate them, get personalized recommendations, and share your collection.\n\nCreate your own free library: https://benfischman71.github.io/audiobook-library/";
+                if (navigator.share) {
+                  navigator.share({title: "My Personal Library", text: inviteMsg}).catch(function(){});
+                } else {
+                  navigator.clipboard.writeText(inviteMsg).then(function(){flash("Invite copied!");}).catch(function(){flash("Copy failed");});
+                }
+              },style:{width:"100%",background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,marginTop:12}}, navigator.share ? "Send Invite" : "Copy Invite Link")
+            ),
+
+            E("button", {onClick:function(){setShowShare(false);},style:{background:"transparent",color:"var(--text3)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14,marginTop:4}}, "Close")
           )
         ) : null,
 
