@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="My Library">
   <meta name="theme-color" content="#0c0b09">
-  <title>My Audiobook Library</title>
+  <title>My Personal Library</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -600,18 +600,9 @@
                   setSyncStatus("synced");
                 });
               } else {
-                // Brand new user: push preloaded books
-                var local = BOOKS.map(function(b) { return Object.assign({}, b, {user_id: user.id}); });
-                var promises = [];
-                for (var i = 0; i < local.length; i += 50) {
-                  promises.push(client.upsert("books", local.slice(i, i + 50)));
-                }
-                return Promise.all(promises).then(function() {
-                  return client.select("books");
-                }).then(function(myBooks) {
-                  setBooks(myBooks);
-                  setSyncStatus("synced");
-                });
+                // Brand new user: start with empty library
+                setBooks([]);
+                setSyncStatus("synced");
               }
             });
           }
@@ -725,7 +716,7 @@
       (function() {
         var rated = books.filter(function(b){return b.rating>0;}).sort(function(a,b){return b.rating-a.rating||a.title.localeCompare(b.title);});
         var unrated = books.filter(function(b){return b.rating===0;}).sort(function(a,b){return a.title.localeCompare(b.title);});
-        shareText = "My Audiobook Library (" + books.length + " books)\n" + rc + " rated, Avg: " + avg + "/5\n\n";
+        shareText = "My Personal Library (" + books.length + " books)\n" + rc + " rated, Avg: " + avg + "/5\n\n";
         if (rated.length) { shareText += "RATED\n"; rated.forEach(function(b) { shareText += "\u2605".repeat(b.rating) + "\u2606".repeat(5-b.rating) + " " + b.title + " - " + b.author + "\n"; }); }
         if (unrated.length) { shareText += "\nFULL LIST\n"; unrated.forEach(function(b) { shareText += "- " + b.title + " - " + b.author + "\n"; }); }
       })();
@@ -759,8 +750,8 @@
         return E("div", {style:{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
           E("div", {style:{maxWidth:380,width:"100%",textAlign:"center"}},
             E("div", {style:{marginBottom:32}},
-              E("h1", {className:"serif",style:{fontSize:32,color:"var(--gold)",marginBottom:8}}, "My Audiobook Library"),
-              E("p", {style:{color:"var(--text2)",fontSize:13,lineHeight:1.6}}, "Track your audiobooks, rate them, and share your collection.")
+              E("h1", {className:"serif",style:{fontSize:32,color:"var(--gold)",marginBottom:8}}, "My Personal Library"),
+              E("p", {style:{color:"var(--text2)",fontSize:13,lineHeight:1.6}}, "Track your books, rate them, and share your collection.")
             ),
             E("div", {style:{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,textAlign:"left"}},
               E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20,textAlign:"center"}}, authMode === "login" ? "Sign In" : "Create Account"),
@@ -848,7 +839,12 @@
               )
             );
           }),
-          filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
+          filtered.length === 0 && books.length === 0 ? E("div", {style:{textAlign:"center",padding:"80px 20px"}},
+            E("div", {style:{fontSize:48,marginBottom:16}}, "\uD83D\uDCDA"),
+            E("h2", {className:"serif",style:{fontSize:24,color:"var(--gold)",marginBottom:12}}, "Your Library is Empty"),
+            E("p", {style:{color:"var(--text2)",fontSize:14,lineHeight:1.6,maxWidth:320,margin:"0 auto 24px"}}, "Tap + Add above to start building your book collection. Search by title to auto-fill book details."),
+            E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book")
+          ) : filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
         ),
 
         /* Account Modal */
