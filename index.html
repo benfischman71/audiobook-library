@@ -788,7 +788,8 @@
                 E("button", {onClick:function(){setShowSettings(true);},style:{background:"transparent",border:"none",display:"flex",alignItems:"center",gap:4,color:"var(--text3)",fontSize:10,padding:"4px 8px",cursor:"pointer"}},
                   E("span", {style:{width:6,height:6,borderRadius:"50%",display:"inline-block",marginRight:5,background:syncDot}}), syncLabel),
                 E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600}}, "+ Add"),
-                E("button", {onClick:function(){setShowShare(true);},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Share")
+                E("button", {onClick:function(){setShowShare(true);},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Share"),
+                E("button", {onClick:handleLogout,style:{background:"transparent",color:"var(--text3)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Sign Out")
               )
             ),
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
