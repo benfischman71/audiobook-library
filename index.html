@@ -584,28 +584,8 @@
         setSyncStatus("syncing");
 
         client.select("books").then(function(remote) {
-          if (remote.length > 0) {
-            setBooks(remote);
-            setSyncStatus("synced");
-          } else {
-            // First login: claim unclaimed books + push preloaded books
-            var anonClient = createClient(SUPA_KEY);
-            return anonClient.select("books", "&user_id=is.null").then(function(unclaimed) {
-              if (unclaimed.length > 0) {
-                // Claim existing books
-                return anonClient.update("books", "user_id=is.null", {user_id: user.id}).then(function() {
-                  return client.select("books");
-                }).then(function(myBooks) {
-                  setBooks(myBooks);
-                  setSyncStatus("synced");
-                });
-              } else {
-                // Brand new user: start with empty library
-                setBooks([]);
-                setSyncStatus("synced");
-              }
-            });
-          }
+          setBooks(remote || []);
+          setSyncStatus("synced");
         }).catch(function(e) {
           console.error("Sync error:", e);
           setSyncStatus("error");
