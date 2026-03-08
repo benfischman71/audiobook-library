@@ -699,7 +699,7 @@
           "subject:" + cat + (subcat ? " " + subcat : ""),
           book.title.split(/[\s:,]+/).slice(0, 2).join(" ") + " " + cat
         ];
-        fetchMultiRecs(queries, "If you loved " + book.title);
+        fetchMultiRecs(queries, "\u2728 Because you loved " + book.title);
       }
 
       function recByCategory(cat) {
@@ -713,7 +713,7 @@
           queries.push("subject:" + cat + " " + favs[0].title.split(/[\s:,]+/).slice(0, 2).join(" "));
           if (favs.length > 1) queries.push("subject:" + cat + " " + favs[1].author.split(" ").pop());
         }
-        fetchMultiRecs(queries, "Recommended: " + cat);
+        fetchMultiRecs(queries, "\u2728 Genie Picks: " + cat);
       }
 
       // Fetch longer description when expanding a book
@@ -863,7 +863,7 @@
                   E("span", {style:{width:6,height:6,borderRadius:"50%",display:"inline-block",marginRight:5,background:syncDot}}), syncLabel),
                 E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600}}, "+ Add"),
                 E("select", {value:"",onChange:function(e){if(e.target.value)recByCategory(e.target.value);e.target.value="";},style:{background:"var(--surface)",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 8px",fontSize:12,cursor:"pointer",width:"auto"}},
-                  E("option",{value:""},"Recommend"),
+                  E("option",{value:""},"\u2728 Genie"),
                   REC_CATS.map(function(c){return E("option",{key:c,value:c},c);})
                 ),
                 E("button", {onClick:function(){setShowShare(true);},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Share"),
@@ -910,12 +910,12 @@
                   ),
                   E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
                   E("span", {onClick:function(e){e.stopPropagation();handleMine(book.id);},style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:book.mine===false?"var(--success)":"var(--text4)",background:book.mine===false?"rgba(90,154,106,0.1)":"transparent",border:"1px solid " + (book.mine===false?"rgba(90,154,106,0.3)":"var(--border)"),borderRadius:4,padding:"2px 7px",letterSpacing:0.3,cursor:"pointer"}}, book.mine===false ? "Mark Mine" : "Not Mine"),
+                  E("span", {onClick:function(e){e.stopPropagation();recForBook(book);},style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"var(--gold)",background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,cursor:"pointer",fontWeight:500}}, "\u2728 Genie"),
                   book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 " + userName + "'s Favorite") : null,
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
                     loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
                     descs[book.id] ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : (!loadDesc && book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null),
                     E("div", {style:{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}},
-                      E("button", {onClick:function(e){e.stopPropagation();recForBook(book);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:6,padding:"4px 12px",fontSize:11,fontWeight:600}}, "Similar Books"),
                       E("button", {onClick:function(e){e.stopPropagation();handleMine(book.id);},style:{background:"transparent",color:book.mine===false?"var(--success)":"var(--text3)",border:"1px solid " + (book.mine===false?"var(--success)":"var(--border)"),borderRadius:6,padding:"4px 12px",fontSize:11,opacity:0.9}}, book.mine===false ? "Mark as Mine" : "Not My Book"),
                       E("button", {onClick:function(e){e.stopPropagation();handleDelete(book.id);},style:{background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:6,padding:"4px 12px",fontSize:11,opacity:0.7}}, "Remove")
                     )
