@@ -1145,18 +1145,16 @@
                 E("h1", {className:"serif",style:{fontSize:24,color:"var(--gold)",fontWeight:600,margin:0}}, userName + "'s Library"),
                 E("p", {style:{margin:"3px 0 0",fontSize:11,color:"var(--text3)",fontWeight:300,letterSpacing:0.5}}, books.length + " titles \u00b7 " + rc + " rated \u00b7 avg " + avg + "\u2605")
               ),
-              E("div", {style:{display:"flex",gap:6,alignItems:"center"}},
-                E("button", {onClick:function(){setShowSettings(true);},style:{background:"transparent",border:"none",display:"flex",alignItems:"center",gap:4,color:"var(--text3)",fontSize:10,padding:"4px 8px",cursor:"pointer"}},
-                  E("span", {style:{width:6,height:6,borderRadius:"50%",display:"inline-block",marginRight:5,background:syncDot}}), syncLabel),
-                E("button", {onClick:fetchNewBooks,style:{background:newBooksAlert?"rgba(194,84,80,0.15)":"transparent",color:newBooksAlert?"var(--danger)":"var(--text2)",border:newBooksAlert?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,animation:newBooksAlert?"pulse 1.5s infinite":"none"}}, "\uD83D\uDD25 New"),
-                E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600}}, "+ Add"),
-                E("button", {onClick:function(){if(fileRef.current)fileRef.current.click();},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Import"),
-                E("select", {value:"",onChange:function(e){if(e.target.value)recByCategory(e.target.value);e.target.value="";},style:{background:"var(--surface)",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 8px",fontSize:12,cursor:"pointer",width:"auto"}},
+              E("div", {style:{display:"flex",gap:5,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}},
+                E("button", {onClick:fetchNewBooks,style:{background:newBooksAlert?"rgba(194,84,80,0.15)":"transparent",color:newBooksAlert?"var(--danger)":"var(--text2)",border:newBooksAlert?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:6,padding:"5px 8px",fontSize:11,fontWeight:600,animation:newBooksAlert?"pulse 1.5s infinite":"none"}}, "\uD83D\uDD25 New"),
+                E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:6,padding:"5px 10px",fontSize:11,fontWeight:600}}, "+ Add"),
+                E("button", {onClick:function(){if(fileRef.current)fileRef.current.click();},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:6,padding:"5px 8px",fontSize:11}}, "Import"),
+                E("select", {value:"",onChange:function(e){if(e.target.value)recByCategory(e.target.value);e.target.value="";},style:{background:"var(--surface)",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:6,padding:"5px 6px",fontSize:11,cursor:"pointer",width:"auto"}},
                   E("option",{value:""},"\u2728 Genie"),
                   REC_CATS.map(function(c){return E("option",{key:c,value:c},c);})
                 ),
-                E("button", {onClick:function(){setShowShare(true);},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Share"),
-                E("button", {onClick:handleLogout,style:{background:"transparent",color:"var(--text3)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Sign Out")
+                E("button", {onClick:function(){setShowShare(true);},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:6,padding:"5px 8px",fontSize:11}}, "Share"),
+                E("button", {onClick:handleLogout,style:{background:"transparent",color:"var(--text3)",border:"1px solid var(--border)",borderRadius:6,padding:"5px 8px",fontSize:11}}, "Out")
               )
             ),
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
