@@ -21,6 +21,7 @@
     ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     @keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
     @keyframes fadeScale{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
   </style>
 </head>
 <body>
@@ -537,6 +538,7 @@
       var syncState = useState("local"); var syncStatus = syncState[0]; var setSyncStatus = syncState[1];
       var recsState = useState([]); var recs = recsState[0]; var setRecs = recsState[1];
       var recsLoadState = useState(false); var recsLoading = recsLoadState[0]; var setRecsLoading = recsLoadState[1];
+      var newBooksAlertState = useState(false); var newBooksAlert = newBooksAlertState[0]; var setNewBooksAlert = newBooksAlertState[1];
       var recsTitleState = useState(""); var recsTitle = recsTitleState[0]; var setRecsTitle = recsTitleState[1];
       var showRecsState = useState(false); var showRecs = showRecsState[0]; var setShowRecs = showRecsState[1];
       var clientRef = useRef(null);
@@ -741,6 +743,113 @@
         }).finally(function() { setRecsLoading(false); });
       }
 
+      // New Books feature
+      function getTopCategories() {
+        var catCount = {};
+        books.forEach(function(b) {
+          if (b.rating >= 4) {
+            var cat = b.category.split(" / ")[0];
+            catCount[cat] = (catCount[cat] || 0) + b.rating;
+          }
+        });
+        var sorted = Object.keys(catCount).sort(function(a, b) { return catCount[b] - catCount[a]; });
+        return sorted.slice(0, 4);
+      }
+
+      function fetchNewBooks() {
+        var topCats = getTopCategories();
+        if (topCats.length === 0) topCats = ["History", "Fiction", "Biography"];
+        var existing = getLibraryTitles();
+        var seen = {};
+        var allResults = [];
+        var now = new Date();
+        var sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        var dateStr = sixMonthsAgo.getFullYear() + "-" + String(sixMonthsAgo.getMonth() + 1).padStart(2, "0") + "-01";
+
+        setRecsLoading(true);
+        setRecs([]);
+        setRecsTitle("\uD83D\uDD25 New Books For You");
+        setShowRecs(true);
+
+        function addNew(title, author, rat, rc, desc, thumb, cat) {
+          var key = title.toLowerCase();
+          if (existing[key] || seen[key]) return;
+          seen[key] = true;
+          allResults.push({
+            title: title, author: author, rating: rat, ratingsCount: rc,
+            description: desc.substring(0, 200), thumbnail: thumb, category: cat || "New Release",
+            score: rat > 0 ? (rat * Math.log(rc + 1)) + 5 : (desc ? 3 : 0)
+          });
+        }
+
+        var gPromises = topCats.map(function(cat) {
+          return fetch("https://www.googleapis.com/books/v1/volumes?q=subject:" + encodeURIComponent(cat) + "&orderBy=newest&maxResults=20&langRestrict=en")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              (data.items || []).forEach(function(item) {
+                var v = item.volumeInfo;
+                if (!v || !v.title || !v.authors) return;
+                if (!v.description) return;
+                var pub = v.publishedDate || "";
+                if (pub && pub < dateStr) return;
+                if (v.averageRating && v.averageRating < 3) return;
+                var thumb = v.imageLinks ? (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail || "") : "";
+                if (thumb) thumb = thumb.replace("http://", "https://");
+                addNew(v.title, v.authors.join(", "), v.averageRating || 0, v.ratingsCount || 0,
+                  (v.description || "").replace(/<[^>]*>/g, ""), thumb, v.categories ? v.categories[0] : "New Release");
+              });
+            }).catch(function() {});
+        });
+
+        // Also check NYT current lists
+        var nytPromises = ["hardcover-fiction", "hardcover-nonfiction"].map(function(list) {
+          return fetch("https://api.nytimes.com/svc/books/v3/lists/current/" + list + ".json?api-key=" + NYT_KEY)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              ((data.results && data.results.books) || []).forEach(function(b) {
+                if (!b.title || !b.author) return;
+                addNew(b.title, b.author, 0, 0, b.description || "", b.book_image || "", "NYT Bestseller");
+              });
+            }).catch(function() {});
+        });
+
+        Promise.all(gPromises.concat(nytPromises)).then(function() {
+          allResults.sort(function(a, b) { return b.score - a.score; });
+          var final = allResults.slice(0, 15);
+          setRecs(final);
+          // Save what user has seen
+          var seenTitles = final.map(function(r) { return r.title; });
+          localStorage.setItem("ab-new-seen", JSON.stringify({titles: seenTitles, ts: Date.now()}));
+          setNewBooksAlert(false);
+        }).finally(function() { setRecsLoading(false); });
+      }
+
+      // Check for new books in background on load
+      useEffect(function() {
+        if (!user || books.length === 0) return;
+        var lastSeen = JSON.parse(localStorage.getItem("ab-new-seen") || "null");
+        var checkInterval = 24 * 60 * 60 * 1000; // 24 hours
+        if (lastSeen && (Date.now() - lastSeen.ts) < checkInterval) return;
+
+        var topCats = getTopCategories();
+        if (topCats.length === 0) return;
+        var existing = getLibraryTitles();
+        var oldTitles = lastSeen ? lastSeen.titles || [] : [];
+
+        fetch("https://www.googleapis.com/books/v1/volumes?q=subject:" + encodeURIComponent(topCats[0]) + "&orderBy=newest&maxResults=10&langRestrict=en")
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var newOnes = (data.items || []).filter(function(item) {
+              var v = item.volumeInfo;
+              if (!v || !v.title || !v.authors || !v.description) return false;
+              if (existing[v.title.toLowerCase()]) return false;
+              if (oldTitles.indexOf(v.title) >= 0) return false;
+              return true;
+            });
+            if (newOnes.length > 0) setNewBooksAlert(true);
+          }).catch(function() {});
+      }, [user, books.length]);
+
       function recForBook(book) {
         var cat = book.category.split(" / ")[0];
         var subcat = book.category.split(" / ")[1] || "";
@@ -923,7 +1032,8 @@
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
             E("div", {style:{marginBottom:8}},
               E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 " + userName + "'s Favorites"),
-              E("button", {onClick:function(){setHideOthers(!hideOthers);},style:{background:hideOthers?"rgba(90,154,106,0.15)":"var(--surface)",color:hideOthers?"var(--success)":"var(--text2)",border:hideOthers?"1px solid rgba(90,154,106,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",marginLeft:6}}, hideOthers ? "Showing My Books" : "Show All Books")
+              E("button", {onClick:function(){setHideOthers(!hideOthers);},style:{background:hideOthers?"rgba(90,154,106,0.15)":"var(--surface)",color:hideOthers?"var(--success)":"var(--text2)",border:hideOthers?"1px solid rgba(90,154,106,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",marginLeft:6}}, hideOthers ? "Showing My Books" : "Show All Books"),
+              E("button", {onClick:fetchNewBooks,style:{background:newBooksAlert?"rgba(194,84,80,0.15)":"var(--surface)",color:newBooksAlert?"var(--danger)":"var(--text2)",border:newBooksAlert?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",marginLeft:6,animation:newBooksAlert?"pulse 1.5s infinite":"none"}}, "\uD83D\uDD25 New For You")
             ),
             E("div", {style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
               E("select", {value:sort,onChange:function(e){setSort(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
