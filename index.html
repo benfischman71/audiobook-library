@@ -528,6 +528,7 @@
       var ratFState = useState("All"); var ratF = ratFState[0]; var setRatF = ratFState[1];
       var expState = useState(null); var expanded = expState[0]; var setExpanded = expState[1];
       var showAddState = useState(false); var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
+      var dragOverState = useState(false); var dragOver = dragOverState[0]; var setDragOver = dragOverState[1];
       var showShareState = useState(false); var showShare = showShareState[0]; var setShowShare = showShareState[1];
       var showSettingsState = useState(false); var showSettings = showSettingsState[0]; var setShowSettings = showSettingsState[1];
       var addKeyState = useState(0); var addKey = addKeyState[0]; var setAddKey = addKeyState[1];
@@ -547,7 +548,7 @@
       function handleImport(e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
-        e.target.value = "";
+        if (e.target.value !== undefined) e.target.value = "";
         var reader = new FileReader();
         reader.onload = function(ev) {
           try {
@@ -1117,7 +1118,19 @@
         );
       }
 
-      return E("div", {style:{minHeight:"100vh",background:"var(--bg)"}},
+      return E("div", {style:{minHeight:"100vh",background:"var(--bg)"},
+        onDragOver:function(e){e.preventDefault();setDragOver(true);},
+        onDragLeave:function(e){if(e.currentTarget===e.target||!e.currentTarget.contains(e.relatedTarget))setDragOver(false);},
+        onDrop:function(e){e.preventDefault();setDragOver(false);var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)handleImport({target:{files:[f]},preventDefault:function(){}}); }
+      },
+        /* Drop overlay */
+        dragOver ? E("div", {style:{position:"fixed",inset:0,background:"rgba(201,168,76,0.15)",backdropFilter:"blur(4px)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",border:"3px dashed var(--gold)",margin:16,borderRadius:16}},
+          E("div", {style:{textAlign:"center"}},
+            E("div", {style:{fontSize:48,marginBottom:12}}, "\uD83D\uDCE5"),
+            E("div", {className:"serif",style:{fontSize:24,color:"var(--gold)"}}, "Drop CSV to Import"),
+            E("div", {style:{fontSize:13,color:"var(--text2)",marginTop:8}}, "Audible, Goodreads, or any CSV with Title & Author")
+          )
+        ) : null,
         /* Toast */
         toast ? E("div", {style:{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"var(--bg)",padding:"10px 24px",borderRadius:8,fontWeight:600,fontSize:13,zIndex:9999,animation:"fadeIn 0.25s"}}, toast) : null,
 
