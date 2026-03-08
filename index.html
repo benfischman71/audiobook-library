@@ -402,15 +402,43 @@
       );
     }
 
-    /* SUPABASE CLIENT */
-    function createClient(url, key) {
-      var base = url.replace(/\/$/, "");
-      var hd = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json", "Prefer": "return=representation"};
+    /* SUPABASE CONFIG */
+    var SUPA_URL = "https://cfwzrmlygzdsvitjfxze.supabase.co";
+    var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc";
+
+    var supaAuth = {
+      getSession: function() { return JSON.parse(localStorage.getItem("ab-auth") || "null"); },
+      saveSession: function(s) { localStorage.setItem("ab-auth", JSON.stringify(s)); },
+      clearSession: function() { localStorage.removeItem("ab-auth"); },
+      signup: function(email, pw) {
+        return fetch(SUPA_URL + "/auth/v1/signup", {method:"POST", headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"}, body:JSON.stringify({email:email,password:pw})})
+          .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Signup failed"); return d; }); })
+          .then(function(d) { if (d.access_token) { supaAuth.saveSession({access_token:d.access_token,refresh_token:d.refresh_token,user:d.user}); } return d; });
+      },
+      login: function(email, pw) {
+        return fetch(SUPA_URL + "/auth/v1/token?grant_type=password", {method:"POST", headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"}, body:JSON.stringify({email:email,password:pw})})
+          .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Login failed"); return d; }); })
+          .then(function(d) { if (d.access_token) { supaAuth.saveSession({access_token:d.access_token,refresh_token:d.refresh_token,user:d.user}); } return d; });
+      },
+      refresh: function() {
+        var s = supaAuth.getSession();
+        if (!s || !s.refresh_token) return Promise.resolve(null);
+        return fetch(SUPA_URL + "/auth/v1/token?grant_type=refresh_token", {method:"POST", headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"}, body:JSON.stringify({refresh_token:s.refresh_token})})
+          .then(function(r) { return r.json(); })
+          .then(function(d) { if (d.access_token) { supaAuth.saveSession({access_token:d.access_token,refresh_token:d.refresh_token,user:d.user}); return d; } supaAuth.clearSession(); return null; })
+          .catch(function() { return null; });
+      },
+      logout: function() { var s = supaAuth.getSession(); supaAuth.clearSession(); if (s) { fetch(SUPA_URL + "/auth/v1/logout", {method:"POST", headers:{"apikey":SUPA_KEY,"Authorization":"Bearer "+s.access_token}}).catch(function(){}); } }
+    };
+
+    function createClient(token) {
+      var hd = {"apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY), "Content-Type": "application/json", "Prefer": "return=representation"};
       return {
-        select: function(t) { return fetch(base + "/rest/v1/" + t + "?select=*", {headers: hd}).then(function(r) { if (!r.ok) throw new Error("select failed"); return r.json(); }); },
-        upsert: function(t, rows) { return fetch(base + "/rest/v1/" + t, {method:"POST",headers:Object.assign({}, hd, {"Prefer":"resolution=merge-duplicates,return=representation"}),body:JSON.stringify(rows)}).then(function(r) { if (!r.ok) throw new Error("upsert failed"); return r.json(); }); },
-        del: function(t, id) { return fetch(base + "/rest/v1/" + t + "?id=eq." + encodeURIComponent(id), {method:"DELETE",headers:hd}); },
-        test: function() { return fetch(base + "/rest/v1/", {headers: hd}).then(function(r) { return r.ok; }); }
+        select: function(t, extra) { return fetch(SUPA_URL + "/rest/v1/" + t + "?select=*" + (extra || ""), {headers: hd}).then(function(r) { if (!r.ok) throw new Error("select failed"); return r.json(); }); },
+        upsert: function(t, rows) { return fetch(SUPA_URL + "/rest/v1/" + t, {method:"POST",headers:Object.assign({}, hd, {"Prefer":"resolution=merge-duplicates,return=representation"}),body:JSON.stringify(rows)}).then(function(r) { if (!r.ok) throw new Error("upsert failed"); return r.json(); }); },
+        update: function(t, filter, data) { return fetch(SUPA_URL + "/rest/v1/" + t + "?" + filter, {method:"PATCH",headers:hd,body:JSON.stringify(data)}).then(function(r) { if (!r.ok) throw new Error("update failed"); return r.json(); }); },
+        del: function(t, id) { return fetch(SUPA_URL + "/rest/v1/" + t + "?id=eq." + encodeURIComponent(id), {method:"DELETE",headers:hd}); },
+        test: function() { return fetch(SUPA_URL + "/rest/v1/", {headers: hd}).then(function(r) { return r.ok; }); }
       };
     }
 
@@ -482,7 +510,15 @@
 
     /* MAIN APP */
     function App() {
-      var booksState = useState(BOOKS); var books = booksState[0]; var setBooks = booksState[1];
+      var userState = useState(null); var user = userState[0]; var setUser = userState[1];
+      var authLoadState = useState(true); var authLoading = authLoadState[0]; var setAuthLoading = authLoadState[1];
+      var authModeState = useState("login"); var authMode = authModeState[0]; var setAuthMode = authModeState[1];
+      var authEmailState = useState(""); var authEmail = authEmailState[0]; var setAuthEmail = authEmailState[1];
+      var authPwState = useState(""); var authPw = authPwState[0]; var setAuthPw = authPwState[1];
+      var authErrState = useState(""); var authErr = authErrState[0]; var setAuthErr = authErrState[1];
+      var authBusyState = useState(false); var authBusy = authBusyState[0]; var setAuthBusy = authBusyState[1];
+
+      var booksState = useState([]); var books = booksState[0]; var setBooks = booksState[1];
       var searchState = useState(""); var search = searchState[0]; var setSearch = searchState[1];
       var sortState = useState("title-asc"); var sort = sortState[0]; var setSort = sortState[1];
       var catFState = useState("All"); var catF = catFState[0]; var setCatF = catFState[1];
@@ -495,90 +531,96 @@
       var toastState = useState(""); var toast = toastState[0]; var setToast = toastState[1];
       var descState = useState({}); var descs = descState[0]; var setDescs = descState[1];
       var loadDescState = useState(null); var loadDesc = loadDescState[0]; var setLoadDesc = loadDescState[1];
-      
       var syncState = useState("local"); var syncStatus = syncState[0]; var setSyncStatus = syncState[1];
-      var supaUrlState = useState("https://cfwzrmlygzdsvitjfxze.supabase.co"); var supaUrl = supaUrlState[0]; var setSupaUrl = supaUrlState[1];
-      var supaKeyState = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc"); var supaKey = supaKeyState[0]; var setSupaKey = supaKeyState[1];
-      var settUrlState = useState("https://cfwzrmlygzdsvitjfxze.supabase.co"); var settingsUrl = settUrlState[0]; var setSettingsUrl = settUrlState[1];
-      var settKeyState = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc"); var settingsKey = settKeyState[0]; var setSettingsKey = settKeyState[1];
-      var connectingState = useState(false); var connecting = connectingState[0]; var setConnecting = connectingState[1];
       var clientRef = useRef(null);
 
       function flash(m) { setToast(m); setTimeout(function() { setToast(""); }, 2200); }
 
-      // Init from localStorage
+      // Check existing session on load
       useEffect(function() {
-        var saved = localStorage.getItem("ab-lib-data");
-        if (saved) {
-          try {
-            var d = JSON.parse(saved);
-            if (d.ratings || d.favs) {
-              setBooks(function(prev) {
-                return prev.map(function(b) {
-                  var updates = {};
-                  if (d.ratings && d.ratings[b.title]) updates.rating = d.ratings[b.title];
-                  if (d.favs && d.favs[b.title]) updates.fav = true;
-                  return Object.keys(updates).length ? Object.assign({}, b, updates) : b;
-                });
-              });
-            }
-            if (d.custom && d.custom.length) {
-              setBooks(function(prev) {
-                var existing = {};
-                prev.forEach(function(b) { existing[b.title.toLowerCase()] = true; });
-                var newBooks = d.custom.filter(function(b) { return !existing[b.title.toLowerCase()]; });
-                return prev.concat(newBooks);
-              });
-            }
-          } catch(e) {}
-        }
+        var session = supaAuth.getSession();
+        if (session && session.access_token && session.user) {
+          supaAuth.refresh().then(function(d) {
+            if (d && d.user) { setUser(d.user); } else { supaAuth.clearSession(); }
+            setAuthLoading(false);
+          });
+        } else { setAuthLoading(false); }
       }, []);
 
-      // Supabase sync
+      // Auth handlers
+      function handleAuthSubmit() {
+        if (!authEmail.trim() || !authPw) { setAuthErr("Email and password required"); return; }
+        setAuthErr(""); setAuthBusy(true);
+        var fn = authMode === "signup" ? supaAuth.signup : supaAuth.login;
+        fn(authEmail.trim(), authPw).then(function(d) {
+          if (d.user) { setUser(d.user); setAuthEmail(""); setAuthPw(""); }
+        }).catch(function(e) {
+          setAuthErr(e.message || "Authentication failed");
+        }).finally(function() { setAuthBusy(false); });
+      }
+
+      function handleLogout() {
+        supaAuth.logout();
+        setUser(null); setBooks([]); clientRef.current = null;
+        setSyncStatus("local"); setShowSettings(false);
+      }
+
+      // Sync books when user logs in
       useEffect(function() {
-        if (!supaUrl || !supaKey) { setSyncStatus("local"); return; }
-        var client = createClient(supaUrl, supaKey);
+        if (!user) return;
+        var session = supaAuth.getSession();
+        if (!session) return;
+        var client = createClient(session.access_token);
         clientRef.current = client;
         setSyncStatus("syncing");
+
         client.select("books").then(function(remote) {
           if (remote.length > 0) {
             setBooks(remote);
+            setSyncStatus("synced");
           } else {
-            // Push local books to cloud in batches
-            var local = BOOKS;
-            var savedData = localStorage.getItem("ab-lib-data");
-            if (savedData) {
-              try {
-                var d = JSON.parse(savedData);
-                if (d.ratings) local = local.map(function(b) { return d.ratings[b.title] ? Object.assign({}, b, {rating: d.ratings[b.title]}) : b; });
-              } catch(e) {}
-            }
-            var promises = [];
-            for (var i = 0; i < local.length; i += 50) {
-              promises.push(client.upsert("books", local.slice(i, i + 50)));
-            }
-            return Promise.all(promises);
+            // First login: claim unclaimed books + push preloaded books
+            var anonClient = createClient(SUPA_KEY);
+            return anonClient.select("books", "&user_id=is.null").then(function(unclaimed) {
+              if (unclaimed.length > 0) {
+                // Claim existing books
+                return anonClient.update("books", "user_id=is.null", {user_id: user.id}).then(function() {
+                  return client.select("books");
+                }).then(function(myBooks) {
+                  setBooks(myBooks);
+                  setSyncStatus("synced");
+                });
+              } else {
+                // Brand new user: push preloaded books
+                var local = BOOKS.map(function(b) { return Object.assign({}, b, {user_id: user.id}); });
+                var promises = [];
+                for (var i = 0; i < local.length; i += 50) {
+                  promises.push(client.upsert("books", local.slice(i, i + 50)));
+                }
+                return Promise.all(promises).then(function() {
+                  return client.select("books");
+                }).then(function(myBooks) {
+                  setBooks(myBooks);
+                  setSyncStatus("synced");
+                });
+              }
+            });
           }
-        }).then(function() {
-          setSyncStatus("synced");
         }).catch(function(e) {
           console.error("Sync error:", e);
           setSyncStatus("error");
         });
-      }, [supaUrl, supaKey]);
+      }, [user]);
 
       function saveLocal(updated) {
-        var ratings = {};
-        var favs = {};
-        updated.forEach(function(b) { if (b.rating > 0) ratings[b.title] = b.rating; if (b.fav) favs[b.title] = true; });
-        var custom = updated.filter(function(b) { return b.custom; });
-        localStorage.setItem("ab-lib-data", JSON.stringify({ratings: ratings, favs: favs, custom: custom}));
+        /* localStorage backup no longer primary - cloud is source of truth */
       }
 
       function pushCloud(items) {
-        if (!clientRef.current) return;
+        if (!clientRef.current || !user) return;
+        var withUser = items.map(function(b) { return Object.assign({}, b, {user_id: user.id}); });
         setSyncStatus("syncing");
-        clientRef.current.upsert("books", items).then(function() {
+        clientRef.current.upsert("books", withUser).then(function() {
           setSyncStatus("synced");
         }).catch(function() { setSyncStatus("error"); });
       }
@@ -586,7 +628,6 @@
       function handleRate(id, r) {
         setBooks(function(prev) {
           var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {rating: r}) : b; });
-          saveLocal(u);
           var changed = u.find(function(b) { return b.id === id; });
           if (changed) pushCloud([changed]);
           return u;
@@ -596,7 +637,6 @@
       function handleFav(id) {
         setBooks(function(prev) {
           var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {fav: !b.fav}) : b; });
-          saveLocal(u);
           var changed = u.find(function(b) { return b.id === id; });
           if (changed) pushCloud([changed]);
           return u;
@@ -623,10 +663,10 @@
 
       // Search for book when adding
       function onBookAdded(book) {
+        var bookWithUser = Object.assign({}, book, {user_id: user ? user.id : null});
         setBooks(function(prev) {
-          var u = prev.concat([book]);
-          saveLocal(u);
-          pushCloud([book]);
+          var u = prev.concat([bookWithUser]);
+          pushCloud([bookWithUser]);
           return u;
         });
         setShowAdd(false);
@@ -637,36 +677,11 @@
       function handleDelete(id) {
         setBooks(function(prev) {
           var u = prev.filter(function(b) { return b.id !== id; });
-          saveLocal(u);
           if (clientRef.current) clientRef.current.del("books", id).catch(function(){});
           return u;
         });
         setExpanded(null);
         flash("Removed");
-      }
-
-      function handleConnect() {
-        if (!settingsUrl.trim() || !settingsKey.trim()) return;
-        setConnecting(true);
-        var client = createClient(settingsUrl.trim(), settingsKey.trim());
-        client.test().then(function(ok) {
-          if (ok) {
-            localStorage.setItem("ab-supabase", JSON.stringify({url: settingsUrl.trim(), key: settingsKey.trim()}));
-            setSupaUrl(settingsUrl.trim());
-            setSupaKey(settingsKey.trim());
-            setShowSettings(false);
-            flash("Connected!");
-          } else { flash("Connection failed"); }
-        }).catch(function() { flash("Connection failed"); }).finally(function() { setConnecting(false); });
-      }
-
-      function handleDisconnect() {
-        localStorage.removeItem("ab-supabase");
-        setSupaUrl(""); setSupaKey(""); setSettingsUrl(""); setSettingsKey("");
-        clientRef.current = null;
-        setSyncStatus("local");
-        setShowSettings(false);
-        flash("Disconnected");
       }
 
       var categories = [];
@@ -708,6 +723,8 @@
 
       function handleCopy() { navigator.clipboard.writeText(shareText).then(function(){flash("Copied!");setShowShare(false);}).catch(function(){flash("Copy failed");}); }
 
+      var userName = user && user.email ? user.email.split("@")[0].charAt(0).toUpperCase() + user.email.split("@")[0].slice(1) : "My";
+
       var syncDot = syncStatus === "synced" ? "var(--success)" : syncStatus === "syncing" ? "var(--gold)" : syncStatus === "error" ? "var(--danger)" : "var(--text3)";
       var syncLabel = syncStatus === "synced" ? "Synced" : syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Error" : "Local only";
 
@@ -719,6 +736,41 @@
       }
 
       /* RENDER */
+
+      /* Auth loading */
+      if (authLoading) {
+        return E("div", {style:{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}},
+          E("h1", {className:"serif",style:{fontSize:28,color:"var(--gold)"}}, "My Library"),
+          E("p", {style:{color:"var(--text3)",marginTop:8,fontSize:13}}, "Loading...")
+        );
+      }
+
+      /* Login / Signup screen */
+      if (!user) {
+        return E("div", {style:{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
+          E("div", {style:{maxWidth:380,width:"100%",textAlign:"center"}},
+            E("div", {style:{marginBottom:32}},
+              E("h1", {className:"serif",style:{fontSize:32,color:"var(--gold)",marginBottom:8}}, "My Audiobook Library"),
+              E("p", {style:{color:"var(--text2)",fontSize:13,lineHeight:1.6}}, "Track your audiobooks, rate them, and share your collection.")
+            ),
+            E("div", {style:{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,textAlign:"left"}},
+              E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20,textAlign:"center"}}, authMode === "login" ? "Sign In" : "Create Account"),
+              authErr ? E("div", {style:{background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"var(--danger)"}}, authErr) : null,
+              E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
+                E("input", {type:"email",placeholder:"Email",value:authEmail,onChange:function(e){setAuthEmail(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
+                E("input", {type:"password",placeholder:"Password",value:authPw,onChange:function(e){setAuthPw(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
+                E("button", {onClick:handleAuthSubmit,disabled:authBusy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 20px",fontSize:14,fontWeight:600,opacity:authBusy?0.5:1,marginTop:4}}, authBusy ? "Please wait..." : (authMode === "login" ? "Sign In" : "Create Account")),
+                E("p", {style:{textAlign:"center",fontSize:13,color:"var(--text2)",marginTop:8}},
+                  authMode === "login" ? "Don't have an account? " : "Already have an account? ",
+                  E("span", {onClick:function(){setAuthMode(authMode==="login"?"signup":"login");setAuthErr("");},style:{color:"var(--gold)",cursor:"pointer",textDecoration:"underline"}}, authMode === "login" ? "Sign up" : "Sign in")
+                )
+              )
+            ),
+            E("p", {style:{marginTop:24,fontSize:11,color:"var(--text4)"}}, "Created by BDF")
+          )
+        );
+      }
+
       return E("div", {style:{minHeight:"100vh",background:"var(--bg)"}},
         /* Toast */
         toast ? E("div", {style:{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"var(--bg)",padding:"10px 24px",borderRadius:8,fontWeight:600,fontSize:13,zIndex:9999,animation:"fadeIn 0.25s"}}, toast) : null,
@@ -728,7 +780,7 @@
           E("div", {style:{maxWidth:800,margin:"0 auto"}},
             E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},
               E("div", null,
-                E("h1", {className:"serif",style:{fontSize:24,color:"var(--gold)",fontWeight:600,margin:0}}, "My Library"),
+                E("h1", {className:"serif",style:{fontSize:24,color:"var(--gold)",fontWeight:600,margin:0}}, userName + "'s Library"),
                 E("p", {style:{margin:"3px 0 0",fontSize:11,color:"var(--text3)",fontWeight:300,letterSpacing:0.5}}, books.length + " titles \u00b7 " + rc + " rated \u00b7 avg " + avg + "\u2605")
               ),
               E("div", {style:{display:"flex",gap:6,alignItems:"center"}},
@@ -740,7 +792,7 @@
             ),
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
             E("div", {style:{marginBottom:8}},
-              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 Ben's Favorites")
+              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 " + userName + "'s Favorites")
             ),
             E("div", {style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
               E("select", {value:sort,onChange:function(e){setSort(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
@@ -776,7 +828,7 @@
                     )
                   ),
                   E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
-                  book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 Ben's Favorite") : null,
+                  book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 " + userName + "'s Favorite") : null,
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
                     loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
                     descs[book.id] ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : (!loadDesc && book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null),
@@ -789,23 +841,18 @@
           filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
         ),
 
-        /* Settings Modal */
+        /* Account Modal */
         showSettings ? E(Modal, {onClose:function(){setShowSettings(false);}},
-          E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Cloud Sync"),
-          E("p", {style:{color:"var(--text2)",fontSize:13,marginBottom:20,lineHeight:1.5}}, "Connect to Supabase for cloud sync across devices."),
-          E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
-            E("div", null,
-              E("label", {style:{fontSize:11,color:"var(--text3)",marginBottom:4,display:"block",textTransform:"uppercase",letterSpacing:0.5}}, "Supabase URL"),
-              E("input", {placeholder:"https://xxxxx.supabase.co",value:settingsUrl,onChange:function(e){setSettingsUrl(e.target.value);}})
+          E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Account"),
+          E("div", {style:{display:"flex",flexDirection:"column",gap:16}},
+            E("div", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:16}},
+              E("div", {style:{fontSize:11,color:"var(--text3)",textTransform:"uppercase",letterSpacing:0.5,marginBottom:6}}, "Signed in as"),
+              E("div", {style:{fontSize:14,color:"var(--text)"}}, user ? user.email : ""),
+              E("div", {style:{fontSize:11,color:"var(--text3)",marginTop:8}}, books.length + " books in your library")
             ),
-            E("div", null,
-              E("label", {style:{fontSize:11,color:"var(--text3)",marginBottom:4,display:"block",textTransform:"uppercase",letterSpacing:0.5}}, "API Key"),
-              E("input", {placeholder:"eyJ...",value:settingsKey,onChange:function(e){setSettingsKey(e.target.value);},type:"password"})
-            ),
-            E("div", {style:{display:"flex",gap:8,marginTop:8}},
-              E("button", {onClick:handleConnect,disabled:connecting,style:{flex:1,background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"10px 20px",fontSize:14,fontWeight:600,opacity:connecting?0.4:1}}, connecting ? "Connecting..." : "Connect"),
-              supaUrl ? E("button", {onClick:handleDisconnect,style:{background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:8,padding:"10px 16px",fontSize:14}}, "Disconnect") : null,
-              E("button", {onClick:function(){setShowSettings(false);},style:{background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Close")
+            E("div", {style:{display:"flex",gap:8}},
+              E("button", {onClick:handleLogout,style:{flex:1,background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Sign Out"),
+              E("button", {onClick:function(){setShowSettings(false);},style:{flex:1,background:"transparent",color:"var(--text2)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14}}, "Close")
             )
           )
         ) : null,
