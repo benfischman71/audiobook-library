@@ -909,6 +909,7 @@
                     )
                   ),
                   E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
+                  E("span", {onClick:function(e){e.stopPropagation();handleMine(book.id);},style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:book.mine===false?"var(--success)":"var(--text4)",background:book.mine===false?"rgba(90,154,106,0.1)":"transparent",border:"1px solid " + (book.mine===false?"rgba(90,154,106,0.3)":"var(--border)"),borderRadius:4,padding:"2px 7px",letterSpacing:0.3,cursor:"pointer"}}, book.mine===false ? "Mark Mine" : "Not Mine"),
                   book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 " + userName + "'s Favorite") : null,
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
                     loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
