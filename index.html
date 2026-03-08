@@ -404,6 +404,7 @@
 
     /* SUPABASE CONFIG */
     var SUPA_URL = "https://cfwzrmlygzdsvitjfxze.supabase.co";
+    var NYT_KEY = "vuoHLcR7zQhdWra33uEVXlMKgDFDVPTMdNByQh77ooNTOynj";
     var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmd3pybWx5Z3pkc3ZpdGpmeHplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NjI0OTEsImV4cCI6MjA4NzMzODQ5MX0.r7g5UW6NBvCs3AlAdfj8oXcQcEHZ0b7poG2BepbFauc";
 
     var supaAuth = {
@@ -640,6 +641,14 @@
       // Recommendation helper
       var REC_CATS = ["History","Biography","Fiction","Science Fiction","Mystery / Thriller","Business","Self-Help","Historical Fiction","True Crime","Memoir","Psychology","Politics","Literary Fiction"];
 
+      var NYT_LISTS = {
+        "History":"hardcover-nonfiction","Biography":"hardcover-nonfiction","Fiction":"hardcover-fiction",
+        "Science Fiction":"hardcover-fiction","Mystery / Thriller":"hardcover-fiction","Business":"hardcover-nonfiction",
+        "Self-Help":"advice-how-to-and-miscellaneous","Historical Fiction":"hardcover-fiction",
+        "True Crime":"hardcover-nonfiction","Memoir":"hardcover-nonfiction","Psychology":"hardcover-nonfiction",
+        "Politics":"hardcover-nonfiction","Literary Fiction":"hardcover-fiction"
+      };
+
       function getLibraryTitles() {
         var t = {};
         books.forEach(function(b) { t[b.title.toLowerCase()] = true; });
@@ -656,40 +665,79 @@
         var seen = {};
         var allResults = [];
 
-        var promises = queries.map(function(q) {
+        function addResult(title, author, rat, rc, desc, thumb, cat) {
+          var key = title.toLowerCase();
+          if (existing[key] || seen[key]) return;
+          seen[key] = true;
+          allResults.push({
+            title: title, author: author, rating: rat, ratingsCount: rc,
+            description: desc.substring(0, 200),
+            thumbnail: thumb, category: cat,
+            score: rat > 0 ? (rat * Math.log(rc + 1)) + 5 : (cat === "NYT Bestseller" ? 8 : (desc ? 2 : 0))
+          });
+        }
+
+        // Google Books queries
+        var gPromises = queries.map(function(q) {
           return fetch("https://www.googleapis.com/books/v1/volumes?q=" + encodeURIComponent(q) + "&maxResults=40&orderBy=relevance&langRestrict=en")
             .then(function(r) { return r.json(); })
-            .then(function(data) { return data.items || []; })
-            .catch(function() { return []; });
+            .then(function(data) {
+              (data.items || []).forEach(function(item) {
+                var v = item.volumeInfo;
+                if (!v || !v.title || !v.authors) return;
+                if (!v.description && !v.categories) return;
+                var thumb = v.imageLinks ? (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail || "") : "";
+                if (thumb) thumb = thumb.replace("http://", "https://");
+                addResult(v.title, v.authors.join(", "), v.averageRating || 0, v.ratingsCount || 0,
+                  (v.description || "").replace(/<[^>]*>/g, ""), thumb, v.categories ? v.categories[0] : "");
+              });
+            }).catch(function() {});
         });
 
-        Promise.all(promises).then(function(results) {
-          results.forEach(function(items) {
-            items.forEach(function(item) {
-              var v = item.volumeInfo;
-              if (!v || !v.title || !v.authors) return;
-              if (!v.description && !v.categories) return;
-              var key = v.title.toLowerCase();
-              if (existing[key] || seen[key]) return;
-              seen[key] = true;
-              var thumb = v.imageLinks ? (v.imageLinks.thumbnail || v.imageLinks.smallThumbnail || "") : "";
-              if (thumb) thumb = thumb.replace("http://", "https://");
-              var rat = v.averageRating || 0;
-              var rc = v.ratingsCount || 0;
-              allResults.push({
-                title: v.title,
-                author: v.authors.join(", "),
-                rating: rat,
-                ratingsCount: rc,
-                description: (v.description || "").replace(/<[^>]*>/g, "").substring(0, 200),
-                thumbnail: thumb,
-                category: v.categories ? v.categories[0] : "",
-                score: rat > 0 ? (rat * Math.log(rc + 1)) + 5 : (v.description ? 2 : 0)
+        // Open Library queries
+        var olQueries = queries.map(function(q) {
+          var clean = q.replace(/subject:/g, "").replace(/bestseller|award winning/g, "").trim();
+          return clean;
+        }).filter(function(q) { return q.length > 1; });
+
+        var olPromises = olQueries.slice(0, 3).map(function(q) {
+          return fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(q) + "&limit=20&language=eng&sort=rating")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              (data.docs || []).forEach(function(doc) {
+                if (!doc.title || !doc.author_name) return;
+                var rat = doc.ratings_average || 0;
+                var rc = doc.ratings_count || 0;
+                var coverId = doc.cover_i;
+                var thumb = coverId ? "https://covers.openlibrary.org/b/id/" + coverId + "-M.jpg" : "";
+                var desc = doc.first_sentence ? (Array.isArray(doc.first_sentence) ? doc.first_sentence[0] : doc.first_sentence) : "";
+                var cat = doc.subject ? doc.subject.slice(0, 2).join(", ") : "";
+                addResult(doc.title, doc.author_name.slice(0, 2).join(", "), rat, rc, desc, thumb, cat);
               });
-            });
+            }).catch(function() {});
+        });
+
+        // NYT Bestseller lists
+        var nytList = null;
+        queries.forEach(function(q) {
+          var clean = q.replace(/subject:/g, "").replace(/bestseller|award winning/g, "").trim().split(" ")[0];
+          Object.keys(NYT_LISTS).forEach(function(cat) {
+            if (cat.toLowerCase().indexOf(clean.toLowerCase()) >= 0 && !nytList) nytList = NYT_LISTS[cat];
           });
+        });
+        var nytPromise = nytList ? fetch("https://api.nytimes.com/svc/books/v3/lists/current/" + nytList + ".json?api-key=" + NYT_KEY)
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var books = (data.results && data.results.books) || [];
+            books.forEach(function(b) {
+              if (!b.title || !b.author) return;
+              addResult(b.title, b.author, 0, 0, b.description || "", b.book_image || "", "NYT Bestseller");
+            });
+          }).catch(function() {}) : Promise.resolve();
+
+        Promise.all(gPromises.concat(olPromises).concat([nytPromise])).then(function() {
           allResults.sort(function(a, b) { return b.score - a.score; });
-          setRecs(allResults.slice(0, 12));
+          setRecs(allResults.slice(0, 15));
         }).finally(function() { setRecsLoading(false); });
       }
 
@@ -983,7 +1031,7 @@
         /* Recommendations Modal */
         showRecs ? E(Modal, {onClose:function(){setShowRecs(false);}},
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:4}}, recsTitle),
-          E("p", {style:{color:"var(--text3)",fontSize:11,marginBottom:16}}, "Highly rated books not in your library"),
+          E("p", {style:{color:"var(--text3)",fontSize:11,marginBottom:16}}, "From NYT Bestsellers, Google Books & Open Library"),
           recsLoading ? E("div", {style:{textAlign:"center",padding:40,color:"var(--gold)"}}, "Finding recommendations...") : null,
           !recsLoading && recs.length === 0 ? E("p", {style:{textAlign:"center",padding:40,color:"var(--text3)"}}, "No recommendations found. Try a different category.") : null,
           !recsLoading ? E("div", {style:{display:"flex",flexDirection:"column",gap:0}},
@@ -1002,7 +1050,7 @@
                       E("div", {style:{flexShrink:0,fontSize:11,color:"var(--gold)",whiteSpace:"nowrap"}}, r.rating > 0 ? "\u2605 " + r.rating.toFixed(1) + " (" + r.ratingsCount.toLocaleString() + ")" : "")
                     ),
                     r.description ? E("p", {style:{fontSize:11,color:"var(--text3)",marginTop:6,lineHeight:1.5}}, r.description + (r.description.length >= 195 ? "..." : "")) : null,
-                    r.category ? E("span", {style:{display:"inline-block",marginTop:4,fontSize:8,color:"var(--text4)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:3,padding:"1px 5px",textTransform:"uppercase",letterSpacing:0.3}}, r.category) : null
+                    r.category ? E("span", {style:{display:"inline-block",marginTop:4,fontSize:8,color:r.category==="NYT Bestseller"?"var(--gold)":"var(--text4)",background:r.category==="NYT Bestseller"?"rgba(201,168,76,0.1)":"var(--surface)",border:"1px solid " + (r.category==="NYT Bestseller"?"rgba(201,168,76,0.3)":"var(--border)"),borderRadius:3,padding:"1px 5px",textTransform:"uppercase",letterSpacing:0.3,fontWeight:r.category==="NYT Bestseller"?600:400}}, r.category) : null
                   )
                 )
               );
