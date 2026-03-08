@@ -312,7 +312,7 @@
 ["The Boys in the Light","Nina Willner","History / Cold War","Explores the lives of young people caught between East and West during the Cold War."]];
 
     var BOOKS = D.map(function(r, i) {
-      return {id: "b" + i, title: r[0], author: r[1], category: r[2], overview: r[3], rating: 0, fav: false};
+      return {id: "b" + i, title: r[0], author: r[1], category: r[2], overview: r[3], rating: 0, fav: false, mine: true};
     });
 
     var CATS = [];
@@ -486,7 +486,7 @@
 
       function doAdd() {
         if (!t.trim() || !a.trim()) { setMsg("Title and author required"); setTimeout(function(){setMsg("");}, 2000); return; }
-        props.onAdd({id: "c" + Date.now(), title: t.trim(), author: a.trim(), category: c.trim() || "Uncategorized", overview: o.trim(), rating: 0, fav: false, custom: true});
+        props.onAdd({id: "c" + Date.now(), title: t.trim(), author: a.trim(), category: c.trim() || "Uncategorized", overview: o.trim(), rating: 0, fav: false, mine: true, custom: true});
       }
 
       return E("div", null,
@@ -529,6 +529,7 @@
       var showShareState = useState(false); var showShare = showShareState[0]; var setShowShare = showShareState[1];
       var showSettingsState = useState(false); var showSettings = showSettingsState[0]; var setShowSettings = showSettingsState[1];
       var addKeyState = useState(0); var addKey = addKeyState[0]; var setAddKey = addKeyState[1];
+      var hideOthersState = useState(false); var hideOthers = hideOthersState[0]; var setHideOthers = hideOthersState[1];
       var toastState = useState(""); var toast = toastState[0]; var setToast = toastState[1];
       var descState = useState({}); var descs = descState[0]; var setDescs = descState[1];
       var loadDescState = useState(null); var loadDesc = loadDescState[0]; var setLoadDesc = loadDescState[1];
@@ -623,6 +624,15 @@
         });
       }
 
+      function handleMine(id) {
+        setBooks(function(prev) {
+          var u = prev.map(function(b) { return b.id === id ? Object.assign({}, b, {mine: b.mine === false ? true : false}) : b; });
+          var changed = u.find(function(b) { return b.id === id; });
+          if (changed) pushCloud([changed]);
+          return u;
+        });
+      }
+
       // Fetch longer description when expanding a book
       useEffect(function() {
         if (!expanded) return;
@@ -682,6 +692,7 @@
         else if (ratF === "Unrated") filtered = filtered.filter(function(b) { return b.rating === 0; });
         else filtered = filtered.filter(function(b) { return b.rating === parseInt(ratF); });
       }
+      if (hideOthers) filtered = filtered.filter(function(b) { return b.mine !== false; });
       var sp = sort.split("-"); var sk = sp[0]; var sd = sp[1];
       filtered.sort(function(a, b) {
         var v = sk === "title" ? a.title.localeCompare(b.title) : sk === "author" ? a.author.localeCompare(b.author) : sk === "category" ? a.category.localeCompare(b.category) : sk === "rating" ? a.rating - b.rating : 0;
@@ -774,7 +785,8 @@
             ),
             E("input", {type:"text",placeholder:"Search titles or authors...",value:search,onChange:function(e){setSearch(e.target.value);},style:{marginBottom:10,borderRadius:8,padding:"9px 14px"}}),
             E("div", {style:{marginBottom:8}},
-              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 " + userName + "'s Favorites")
+              E("button", {onClick:function(){setRatF(ratF==="Favs"?"All":"Favs");},style:{background:ratF==="Favs"?"rgba(194,84,80,0.15)":"var(--surface)",color:ratF==="Favs"?"#C25450":"var(--text2)",border:ratF==="Favs"?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}, "\u2764 " + userName + "'s Favorites"),
+              E("button", {onClick:function(){setHideOthers(!hideOthers);},style:{background:hideOthers?"rgba(90,154,106,0.15)":"var(--surface)",color:hideOthers?"var(--success)":"var(--text2)",border:hideOthers?"1px solid rgba(90,154,106,0.4)":"1px solid var(--border)",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all 0.15s",marginLeft:6}}, hideOthers ? "Showing My Books" : "Show All Books")
             ),
             E("div", {style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},
               E("select", {value:sort,onChange:function(e){setSort(e.target.value);},style:{padding:"6px 10px",fontSize:12}},
@@ -795,7 +807,7 @@
         /* Book List */
         E("main", {style:{maxWidth:800,margin:"0 auto",padding:"8px 16px 100px"}},
           filtered.map(function(book) {
-            return E("div", {key:book.id,onClick:function(){setExpanded(expanded===book.id?null:book.id);},style:{borderBottom:"1px solid var(--border)",padding:"14px 0",cursor:"pointer"}},
+            return E("div", {key:book.id,onClick:function(){setExpanded(expanded===book.id?null:book.id);},style:{borderBottom:"1px solid var(--border)",padding:"14px 0",cursor:"pointer",opacity:book.mine===false?0.35:1,transition:"opacity 0.2s"}},
               E("div", {style:{display:"flex",gap:12,alignItems:"flex-start"}},
                 E(Cover, {title:book.title,author:book.author,category:book.category}),
                 E("div", {style:{flex:1,minWidth:0}},
@@ -814,7 +826,10 @@
                   expanded === book.id ? E("div", {style:{animation:"fadeIn 0.2s"}},
                     loadDesc === book.id ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text2)"}}, "Loading description...") : null,
                     descs[book.id] ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.7,color:"var(--text)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:8,padding:"14px 16px"}}, descs[book.id]) : (!loadDesc && book.overview ? E("p", {style:{margin:"10px 0 6px",fontSize:13,lineHeight:1.65,color:"var(--text2)",fontStyle:"italic"}}, book.overview) : null),
-                    E("button", {onClick:function(e){e.stopPropagation();handleDelete(book.id);},style:{background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:6,padding:"4px 12px",fontSize:11,marginTop:4,opacity:0.7}}, "Remove")
+                    E("div", {style:{display:"flex",gap:8,marginTop:8}},
+                      E("button", {onClick:function(e){e.stopPropagation();handleMine(book.id);},style:{background:"transparent",color:book.mine===false?"var(--success)":"var(--text3)",border:"1px solid " + (book.mine===false?"var(--success)":"var(--border)"),borderRadius:6,padding:"4px 12px",fontSize:11,opacity:0.9}}, book.mine===false ? "Mark as Mine" : "Not My Book"),
+                      E("button", {onClick:function(e){e.stopPropagation();handleDelete(book.id);},style:{background:"transparent",color:"var(--danger)",border:"1px solid var(--danger)",borderRadius:6,padding:"4px 12px",fontSize:11,opacity:0.7}}, "Remove")
+                    )
                   ) : null
                 )
               )
