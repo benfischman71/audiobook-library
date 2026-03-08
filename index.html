@@ -515,6 +515,7 @@
       var authModeState = useState("login"); var authMode = authModeState[0]; var setAuthMode = authModeState[1];
       var authEmailState = useState(""); var authEmail = authEmailState[0]; var setAuthEmail = authEmailState[1];
       var authPwState = useState(""); var authPw = authPwState[0]; var setAuthPw = authPwState[1];
+      var authNameState = useState(""); var authName = authNameState[0]; var setAuthName = authNameState[1];
       var authErrState = useState(""); var authErr = authErrState[0]; var setAuthErr = authErrState[1];
       var authBusyState = useState(false); var authBusy = authBusyState[0]; var setAuthBusy = authBusyState[1];
 
@@ -550,10 +551,18 @@
       // Auth handlers
       function handleAuthSubmit() {
         if (!authEmail.trim() || !authPw) { setAuthErr("Email and password required"); return; }
+        if (authMode === "signup" && !authName.trim()) { setAuthErr("First name required"); return; }
         setAuthErr(""); setAuthBusy(true);
-        var fn = authMode === "signup" ? supaAuth.signup : supaAuth.login;
-        fn(authEmail.trim(), authPw).then(function(d) {
-          if (d.user) { setUser(d.user); setAuthEmail(""); setAuthPw(""); }
+        var promise;
+        if (authMode === "signup") {
+          promise = fetch(SUPA_URL + "/auth/v1/signup", {method:"POST", headers:{"apikey":SUPA_KEY,"Content-Type":"application/json"}, body:JSON.stringify({email:authEmail.trim(),password:authPw,options:{data:{first_name:authName.trim()}}})})
+            .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Signup failed"); return d; }); })
+            .then(function(d) { if (d.access_token) { supaAuth.saveSession({access_token:d.access_token,refresh_token:d.refresh_token,user:d.user}); } return d; });
+        } else {
+          promise = supaAuth.login(authEmail.trim(), authPw);
+        }
+        promise.then(function(d) {
+          if (d.user) { setUser(d.user); setAuthEmail(""); setAuthPw(""); setAuthName(""); }
         }).catch(function(e) {
           setAuthErr(e.message || "Authentication failed");
         }).finally(function() { setAuthBusy(false); });
@@ -723,7 +732,7 @@
 
       function handleCopy() { navigator.clipboard.writeText(shareText).then(function(){flash("Copied!");setShowShare(false);}).catch(function(){flash("Copy failed");}); }
 
-      var userName = user && user.email ? user.email.split("@")[0].charAt(0).toUpperCase() + user.email.split("@")[0].slice(1) : "My";
+      var userName = (user && user.user_metadata && user.user_metadata.first_name) ? user.user_metadata.first_name : (user && user.email ? user.email.split("@")[0].charAt(0).toUpperCase() + user.email.split("@")[0].slice(1) : "My");
 
       var syncDot = syncStatus === "synced" ? "var(--success)" : syncStatus === "syncing" ? "var(--gold)" : syncStatus === "error" ? "var(--danger)" : "var(--text3)";
       var syncLabel = syncStatus === "synced" ? "Synced" : syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Error" : "Local only";
@@ -757,6 +766,7 @@
               E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20,textAlign:"center"}}, authMode === "login" ? "Sign In" : "Create Account"),
               authErr ? E("div", {style:{background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"var(--danger)"}}, authErr) : null,
               E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
+                authMode === "signup" ? E("input", {type:"text",placeholder:"First Name",value:authName,onChange:function(e){setAuthName(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}) : null,
                 E("input", {type:"email",placeholder:"Email",value:authEmail,onChange:function(e){setAuthEmail(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
                 E("input", {type:"password",placeholder:"Password",value:authPw,onChange:function(e){setAuthPw(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
                 E("button", {onClick:handleAuthSubmit,disabled:authBusy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 20px",fontSize:14,fontWeight:600,opacity:authBusy?0.5:1,marginTop:4}}, authBusy ? "Please wait..." : (authMode === "login" ? "Sign In" : "Create Account")),
