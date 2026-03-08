@@ -542,6 +542,118 @@
       var recsTitleState = useState(""); var recsTitle = recsTitleState[0]; var setRecsTitle = recsTitleState[1];
       var showRecsState = useState(false); var showRecs = showRecsState[0]; var setShowRecs = showRecsState[1];
       var clientRef = useRef(null);
+      var fileRef = useRef(null);
+
+      function handleImport(e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        e.target.value = "";
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            var text = ev.target.result;
+            // Simple CSV parser
+            var lines = [];
+            var current = "";
+            var inQuote = false;
+            for (var ci = 0; ci < text.length; ci++) {
+              var ch = text[ci];
+              if (ch === '"') { inQuote = !inQuote; }
+              else if (ch === '\n' && !inQuote) { lines.push(current); current = ""; }
+              else { current += ch; }
+            }
+            if (current.trim()) lines.push(current);
+
+            function parseLine(line) {
+              var fields = [];
+              var f = "";
+              var q = false;
+              for (var i = 0; i < line.length; i++) {
+                var c = line[i];
+                if (c === '"') { q = !q; }
+                else if ((c === ',' || c === '\t') && !q) { fields.push(f.trim()); f = ""; }
+                else { f += c; }
+              }
+              fields.push(f.trim());
+              return fields;
+            }
+
+            if (lines.length < 2) { flash("File appears empty"); return; }
+            var headers = parseLine(lines[0]).map(function(h) { return h.toLowerCase().replace(/[^a-z0-9]/g, ""); });
+
+            // Map common column names
+            var titleIdx = -1, authorIdx = -1, catIdx = -1, seriesIdx = -1, subcatIdx = -1;
+            headers.forEach(function(h, i) {
+              if (h === "title" || h === "booktitle") titleIdx = i;
+              if (h === "author" || h === "authors" || h === "authorname" || h === "bookauthor") authorIdx = i;
+              if (h === "category" || h === "genre" || h === "categories" || h === "maincategory" || h === "parentcategory") catIdx = i;
+              if (h === "subcategory" || h === "childcategory") subcatIdx = i;
+              if (h === "series" || h === "seriesname") seriesIdx = i;
+            });
+
+            if (titleIdx === -1) { flash("Could not find a Title column"); return; }
+            if (authorIdx === -1) { flash("Could not find an Author column"); return; }
+
+            var existing = {};
+            books.forEach(function(b) { existing[b.title.toLowerCase()] = true; });
+
+            var imported = [];
+            var skipped = 0;
+            for (var li = 1; li < lines.length; li++) {
+              if (!lines[li].trim()) continue;
+              var fields = parseLine(lines[li]);
+              var title = fields[titleIdx] || "";
+              var author = fields[authorIdx] || "";
+              if (!title.trim() || !author.trim()) continue;
+              if (existing[title.toLowerCase()]) { skipped++; continue; }
+              existing[title.toLowerCase()] = true;
+
+              var cat = "";
+              if (catIdx >= 0) cat = fields[catIdx] || "";
+              if (subcatIdx >= 0 && fields[subcatIdx]) cat = cat ? cat + " / " + fields[subcatIdx] : fields[subcatIdx];
+              if (!cat) cat = "Uncategorized";
+
+              imported.push({
+                id: "i" + Date.now() + "_" + li,
+                title: title.trim(),
+                author: author.trim(),
+                category: cat.trim(),
+                overview: "",
+                rating: 0,
+                fav: false,
+                mine: true,
+                custom: true,
+                user_id: user ? user.id : null
+              });
+            }
+
+            if (imported.length === 0) {
+              flash(skipped > 0 ? "All " + skipped + " books already in library" : "No valid books found in file");
+              return;
+            }
+
+            // Push to cloud in batches
+            var allNew = imported;
+            setBooks(function(prev) { return prev.concat(allNew); });
+
+            if (clientRef.current && user) {
+              var batches = [];
+              for (var bi = 0; bi < allNew.length; bi += 50) {
+                batches.push(clientRef.current.upsert("books", allNew.slice(bi, bi + 50)));
+              }
+              Promise.all(batches).then(function() {
+                flash("Imported " + allNew.length + " books!" + (skipped > 0 ? " (" + skipped + " duplicates skipped)" : ""));
+              }).catch(function() { flash("Import saved locally but cloud sync failed"); });
+            } else {
+              flash("Imported " + allNew.length + " books!");
+            }
+          } catch(err) {
+            console.error("Import error:", err);
+            flash("Error reading file. Make sure it's a CSV.");
+          }
+        };
+        reader.readAsText(file);
+      }
 
       function flash(m) { setToast(m); setTimeout(function() { setToast(""); }, 2200); }
 
@@ -1009,6 +1121,9 @@
         /* Toast */
         toast ? E("div", {style:{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"var(--bg)",padding:"10px 24px",borderRadius:8,fontWeight:600,fontSize:13,zIndex:9999,animation:"fadeIn 0.25s"}}, toast) : null,
 
+        /* Hidden file input for CSV import */
+        E("input", {ref:fileRef,type:"file",accept:".csv,.tsv,.txt",onChange:handleImport,style:{display:"none"}}),
+
         /* Header */
         E("header", {style:{background:"linear-gradient(180deg,var(--surface),var(--bg))",borderBottom:"1px solid var(--border)",padding:"24px 16px 16px",position:"sticky",top:0,zIndex:100}},
           E("div", {style:{maxWidth:800,margin:"0 auto"}},
@@ -1022,6 +1137,7 @@
                   E("span", {style:{width:6,height:6,borderRadius:"50%",display:"inline-block",marginRight:5,background:syncDot}}), syncLabel),
                 E("button", {onClick:fetchNewBooks,style:{background:newBooksAlert?"rgba(194,84,80,0.15)":"transparent",color:newBooksAlert?"var(--danger)":"var(--text2)",border:newBooksAlert?"1px solid rgba(194,84,80,0.4)":"1px solid var(--border)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,animation:newBooksAlert?"pulse 1.5s infinite":"none"}}, "\uD83D\uDD25 New"),
                 E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600}}, "+ Add"),
+                E("button", {onClick:function(){if(fileRef.current)fileRef.current.click();},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 12px",fontSize:12}}, "Import"),
                 E("select", {value:"",onChange:function(e){if(e.target.value)recByCategory(e.target.value);e.target.value="";},style:{background:"var(--surface)",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"6px 8px",fontSize:12,cursor:"pointer",width:"auto"}},
                   E("option",{value:""},"\u2728 Genie"),
                   REC_CATS.map(function(c){return E("option",{key:c,value:c},c);})
