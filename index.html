@@ -1217,7 +1217,10 @@
             E("div", {style:{fontSize:48,marginBottom:16}}, "\uD83D\uDCDA"),
             E("h2", {className:"serif",style:{fontSize:24,color:"var(--gold)",marginBottom:12}}, "Your Library is Empty"),
             E("p", {style:{color:"var(--text2)",fontSize:14,lineHeight:1.6,maxWidth:320,margin:"0 auto 24px"}}, "Tap + Add above to start building your book collection. Search by title to auto-fill book details."),
-            E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book")
+            E("div", {style:{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}},
+              E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book"),
+              E("button", {onClick:function(){if(fileRef.current)fileRef.current.click();},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "Bulk Upload CSV")
+            )
           ) : filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
         ),
 
