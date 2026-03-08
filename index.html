@@ -1088,22 +1088,7 @@
             E("div", {style:{fontSize:48,marginBottom:16}}, "\uD83D\uDCDA"),
             E("h2", {className:"serif",style:{fontSize:24,color:"var(--gold)",marginBottom:12}}, "Your Library is Empty"),
             E("p", {style:{color:"var(--text2)",fontSize:14,lineHeight:1.6,maxWidth:320,margin:"0 auto 24px"}}, "Tap + Add above to start building your book collection. Search by title to auto-fill book details."),
-            E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book"),
-            BOOKS.length > 0 ? E("button", {onClick:function(){
-              if (!clientRef.current || !user) return;
-              flash("Restoring library...");
-              var local = BOOKS.map(function(b) { return Object.assign({}, b, {user_id: user.id}); });
-              var promises = [];
-              for (var i = 0; i < local.length; i += 50) {
-                promises.push(clientRef.current.upsert("books", local.slice(i, i + 50)));
-              }
-              Promise.all(promises).then(function() {
-                return clientRef.current.select("books");
-              }).then(function(myBooks) {
-                setBooks(myBooks);
-                flash("Library restored! " + myBooks.length + " books loaded.");
-              }).catch(function() { flash("Restore failed"); });
-            },style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"12px 24px",fontSize:14,marginTop:12,display:"block",margin:"12px auto 0"}}, "Restore Pre-loaded Library (273 books)") : null
+            E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book")
           ) : filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
         ),
 
