@@ -530,6 +530,7 @@
       var authNameState = useState(""); var authName = authNameState[0]; var setAuthName = authNameState[1];
       var authErrState = useState(""); var authErr = authErrState[0]; var setAuthErr = authErrState[1];
       var authBusyState = useState(false); var authBusy = authBusyState[0]; var setAuthBusy = authBusyState[1];
+      var stayState = useState(true); var stay = stayState[0]; var setStay = stayState[1];
 
       var booksState = useState([]); var books = booksState[0]; var setBooks = booksState[1];
       var searchState = useState(""); var search = searchState[0]; var setSearch = searchState[1];
@@ -667,6 +668,13 @@
       useEffect(function() {
         var session = supaAuth.getSession();
         if (session && session.access_token && session.user) {
+          var exp = localStorage.getItem("ab-session-exp");
+          if (exp && Date.now() > parseInt(exp)) {
+            supaAuth.clearSession();
+            localStorage.removeItem("ab-session-exp");
+            setAuthLoading(false);
+            return;
+          }
           supaAuth.refresh().then(function(d) {
             if (d && d.user) { setUser(d.user); } else { supaAuth.clearSession(); }
             setAuthLoading(false);
@@ -687,7 +695,15 @@
           promise = supaAuth.login(authEmail.trim(), authPw);
         }
         promise.then(function(d) {
-          if (d.user) { setUser(d.user); setAuthEmail(""); setAuthPw(""); setAuthName(""); }
+          if (d.user) {
+            if (stay) {
+              var exp = Date.now() + 30 * 24 * 60 * 60 * 1000;
+              localStorage.setItem("ab-session-exp", String(exp));
+            } else {
+              localStorage.removeItem("ab-session-exp");
+            }
+            setUser(d.user); setAuthEmail(""); setAuthPw(""); setAuthName("");
+          }
         }).catch(function(e) {
           setAuthErr(e.message || "Authentication failed");
         }).finally(function() { setAuthBusy(false); });
@@ -933,7 +949,7 @@
       useEffect(function() {
         if (!user || books.length === 0) return;
         var lastSeen = JSON.parse(localStorage.getItem("ab-new-seen") || "null");
-        var checkInterval = 24 * 60 * 60 * 1000;
+        var checkInterval = 6 * 60 * 60 * 1000; // 6 hours
         if (lastSeen && (Date.now() - lastSeen.ts) < checkInterval) return;
 
         var topCats = getTopCategories();
@@ -1089,6 +1105,10 @@
                 E("input", {type:"email",placeholder:"Email",value:authEmail,onChange:function(e){setAuthEmail(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
                 E("input", {type:"password",placeholder:"Password",value:authPw,onChange:function(e){setAuthPw(e.target.value);},onKeyDown:function(e){if(e.key==="Enter")handleAuthSubmit();}}),
                 E("button", {onClick:handleAuthSubmit,disabled:authBusy,style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 20px",fontSize:14,fontWeight:600,opacity:authBusy?0.5:1,marginTop:4}}, authBusy ? "Please wait..." : (authMode === "login" ? "Sign In" : "Create Account")),
+                authMode === "login" ? E("label", {style:{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"var(--text2)",marginTop:4}},
+                  E("input", {type:"checkbox",checked:stay,onChange:function(e){setStay(e.target.checked);},style:{width:"auto",accentColor:"var(--gold)"}}),
+                  "Stay signed in for 30 days"
+                ) : null,
                 E("p", {style:{textAlign:"center",fontSize:13,color:"var(--text2)",marginTop:8}},
                   authMode === "login" ? "Don't have an account? " : "Already have an account? ",
                   E("span", {onClick:function(){setAuthMode(authMode==="login"?"signup":"login");setAuthErr("");},style:{color:"var(--gold)",cursor:"pointer",textDecoration:"underline"}}, authMode === "login" ? "Sign up" : "Sign in")
