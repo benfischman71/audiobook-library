@@ -323,10 +323,15 @@
 
     /* COLOR MAP */
     var CP = {History:{h:215,s:30},Memoir:{h:28,s:35},Biography:{h:145,s:25},Fiction:{h:280,s:25},"Historical Fiction":{h:42,s:30},Mystery:{h:235,s:25},"Science Fiction":{h:185,s:30},Business:{h:70,s:25},"Self-Help":{h:15,s:30},Psychology:{h:290,s:25},"True Crime":{h:0,s:30},Politics:{h:230,s:20},"Classic Fiction":{h:38,s:35},"Literary Fiction":{h:270,s:20},Thriller:{h:345,s:25},Sports:{h:155,s:28}};
-    function getHue(c) { var b = c.split(" / ")[0]; return CP[b] || {h: (c.length * 37) % 360, s: 22}; }
+
+    /* FIX: null-safe getHue — if category is missing, use a sensible default */
+    function getHue(c) {
+      if (!c || typeof c !== "string") return {h: 200, s: 22};
+      var b = c.split(" / ")[0];
+      return CP[b] || {h: (c.length * 37) % 360, s: 22};
+    }
     function hsh(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return Math.abs(h); }
 
-    /* COVER */
     /* COVER CACHE */
     var _coverCache = {};
     try { var _cc = localStorage.getItem("ab-covers"); if (_cc) _coverCache = JSON.parse(_cc); } catch(e) {}
@@ -359,6 +364,7 @@
       _fetchNextCover();
     }
 
+    /* COVER COMPONENT — null-safe */
     function Cover(props) {
       var imgState = useState(null);
       var img = imgState[0]; var setImg = imgState[1];
@@ -366,21 +372,25 @@
       var failed = failedState[0]; var setFailed = failedState[1];
 
       useEffect(function() {
+        if (!props.title || !props.author) return;
         requestCover(props.title, props.author, function(url) { if (url) setImg(url); else setFailed(true); });
       }, [props.title, props.author]);
 
-      // Generated fallback
-      var hs = getHue(props.category);
+      /* FIX: guard against null/undefined category before calling getHue */
+      var safeCategory = props.category || "History";
+      var hs = getHue(safeCategory);
       var h = hs.h, s = hs.s;
-      var v = hsh(props.title + props.author);
-      var w = props.title.replace(/^(The|A|An)\s+/i, "").split(/[\s:,]+/).filter(function(x){return x.length>0;});
+      var safeTitle = props.title || "";
+      var safeAuthor = props.author || "";
+      var v = hsh(safeTitle + safeAuthor);
+      var w = safeTitle.replace(/^(The|A|An)\s+/i, "").split(/[\s:,]+/).filter(function(x){return x.length>0;});
       var disp = w.slice(0, 3).join(" ");
       var stripe = v % 3 !== 0;
       var sp = 10 + (v % 28);
 
       if (img && !failed) {
         return E("div", {style:{width:52,height:76,borderRadius:"3px 5px 5px 3px",overflow:"hidden",flexShrink:0,boxShadow:"3px 2px 8px rgba(0,0,0,0.4)",background:"var(--surface)"}},
-          E("img", {src: img, style:{width:"100%",height:"100%",objectFit:"cover"}, onError: function(){setFailed(true);}})
+          E("img", {src: img, style:{width:"100%",height:"100%",objectFit:"cover"}, onError: function(){setFailed(true); setImg(null);}})
         );
       }
 
@@ -388,7 +398,7 @@
         E("div", {style: {position:"absolute",left:0,top:0,bottom:0,width:3,background:"linear-gradient(180deg,hsl("+h+","+(s+10)+"%,40%),hsl("+h+","+s+"%,25%))"}}),
         stripe ? E("div", {style: {position:"absolute",left:4,right:4,top:sp,height:1,background:"hsl("+h+","+s+"%,25%)"}}) : null,
         E("div", {style: {fontSize:7,fontWeight:"bold",color:"hsl("+h+","+(s+15)+"%,65%)",textAlign:"center",lineHeight:1.25,fontFamily:"'Cormorant Garamond',Georgia,serif",wordBreak:"break-word",maxHeight:36,overflow:"hidden",paddingLeft:2,textShadow:"0 1px 2px rgba(0,0,0,0.5)"}}, disp),
-        E("div", {style: {fontSize:6,color:"hsl("+h+","+s+"%,40%)",marginTop:4,fontFamily:"'Cormorant Garamond',Georgia,serif",letterSpacing:0.5,textTransform:"uppercase"}}, props.author.split(" ").pop())
+        E("div", {style: {fontSize:6,color:"hsl("+h+","+s+"%,40%)",marginTop:4,fontFamily:"'Cormorant Garamond',Georgia,serif",letterSpacing:0.5,textTransform:"uppercase"}}, safeAuthor.split(" ").pop())
       );
     }
 
@@ -462,7 +472,7 @@
         });
     }
 
-    /* ADD BOOK FORM - isolated component, no parent re-renders */
+    /* ADD BOOK FORM */
     function AddBookForm(props) {
       var tState = useState(""); var t = tState[0]; var setT = tState[1];
       var aState = useState(""); var a = aState[0]; var setA = aState[1];
@@ -553,7 +563,6 @@
         reader.onload = function(ev) {
           try {
             var text = ev.target.result;
-            // Simple CSV parser
             var lines = [];
             var current = "";
             var inQuote = false;
@@ -582,14 +591,12 @@
             if (lines.length < 2) { flash("File appears empty"); return; }
             var headers = parseLine(lines[0]).map(function(h) { return h.toLowerCase().replace(/[^a-z0-9]/g, ""); });
 
-            // Map common column names
-            var titleIdx = -1, authorIdx = -1, catIdx = -1, seriesIdx = -1, subcatIdx = -1;
+            var titleIdx = -1, authorIdx = -1, catIdx = -1, subcatIdx = -1;
             headers.forEach(function(h, i) {
               if (h === "title" || h === "booktitle") titleIdx = i;
               if (h === "author" || h === "authors" || h === "authorname" || h === "bookauthor") authorIdx = i;
               if (h === "category" || h === "genre" || h === "categories" || h === "maincategory" || h === "parentcategory") catIdx = i;
               if (h === "subcategory" || h === "childcategory") subcatIdx = i;
-              if (h === "series" || h === "seriesname") seriesIdx = i;
             });
 
             if (titleIdx === -1) { flash("Could not find a Title column"); return; }
@@ -633,7 +640,6 @@
               return;
             }
 
-            // Push to cloud in batches
             var allNew = imported;
             setBooks(function(prev) { return prev.concat(allNew); });
 
@@ -658,7 +664,6 @@
 
       function flash(m) { setToast(m); setTimeout(function() { setToast(""); }, 2200); }
 
-      // Check existing session on load
       useEffect(function() {
         var session = supaAuth.getSession();
         if (session && session.access_token && session.user) {
@@ -669,7 +674,6 @@
         } else { setAuthLoading(false); }
       }, []);
 
-      // Auth handlers
       function handleAuthSubmit() {
         if (!authEmail.trim() || !authPw) { setAuthErr("Email and password required"); return; }
         if (authMode === "signup" && !authName.trim()) { setAuthErr("First name required"); return; }
@@ -695,7 +699,6 @@
         setSyncStatus("local"); setShowSettings(false);
       }
 
-      // Sync books when user logs in
       useEffect(function() {
         if (!user) return;
         var session = supaAuth.getSession();
@@ -705,17 +708,17 @@
         setSyncStatus("syncing");
 
         client.select("books").then(function(remote) {
-          setBooks(remote || []);
+          /* FIX: ensure every book from Supabase has a category field */
+          var sanitized = (remote || []).map(function(b) {
+            return Object.assign({}, b, {category: b.category || "Uncategorized"});
+          });
+          setBooks(sanitized);
           setSyncStatus("synced");
         }).catch(function(e) {
           console.error("Sync error:", e);
           setSyncStatus("error");
         });
       }, [user]);
-
-      function saveLocal(updated) {
-        /* localStorage backup no longer primary - cloud is source of truth */
-      }
 
       function pushCloud(items) {
         if (!clientRef.current || !user) return;
@@ -753,9 +756,7 @@
         });
       }
 
-      // Recommendation helper
       var REC_CATS = ["History","Biography","Fiction","Science Fiction","Mystery / Thriller","Business","Self-Help","Historical Fiction","True Crime","Memoir","Psychology","Politics","Literary Fiction"];
-
       var NYT_LISTS = {
         "History":"hardcover-nonfiction","Biography":"hardcover-nonfiction","Fiction":"hardcover-fiction",
         "Science Fiction":"hardcover-fiction","Mystery / Thriller":"hardcover-fiction","Business":"hardcover-nonfiction",
@@ -769,7 +770,6 @@
         books.forEach(function(b) { t[b.title.toLowerCase()] = true; });
         return t;
       }
-
 
       function fetchMultiRecs(queries, label) {
         setRecsLoading(true);
@@ -792,7 +792,6 @@
           });
         }
 
-        // Google Books queries
         var gPromises = queries.map(function(q) {
           return fetch("https://www.googleapis.com/books/v1/volumes?q=" + encodeURIComponent(q) + "&maxResults=40&orderBy=relevance&langRestrict=en")
             .then(function(r) { return r.json(); })
@@ -809,10 +808,8 @@
             }).catch(function() {});
         });
 
-        // Open Library queries
         var olQueries = queries.map(function(q) {
-          var clean = q.replace(/subject:/g, "").replace(/bestseller|award winning/g, "").trim();
-          return clean;
+          return q.replace(/subject:/g, "").replace(/bestseller|award winning/g, "").trim();
         }).filter(function(q) { return q.length > 1; });
 
         var olPromises = olQueries.slice(0, 3).map(function(q) {
@@ -832,7 +829,6 @@
             }).catch(function() {});
         });
 
-        // NYT Bestseller lists
         var nytList = null;
         queries.forEach(function(q) {
           var clean = q.replace(/subject:/g, "").replace(/bestseller|award winning/g, "").trim().split(" ")[0];
@@ -843,8 +839,8 @@
         var nytPromise = nytList ? fetch("https://api.nytimes.com/svc/books/v3/lists/current/" + nytList + ".json?api-key=" + NYT_KEY)
           .then(function(r) { return r.json(); })
           .then(function(data) {
-            var books = (data.results && data.results.books) || [];
-            books.forEach(function(b) {
+            var bs = (data.results && data.results.books) || [];
+            bs.forEach(function(b) {
               if (!b.title || !b.author) return;
               addResult(b.title, b.author, 0, 0, b.description || "", b.book_image || "", "NYT Bestseller");
             });
@@ -856,12 +852,11 @@
         }).finally(function() { setRecsLoading(false); });
       }
 
-      // New Books feature
       function getTopCategories() {
         var catCount = {};
         books.forEach(function(b) {
           if (b.rating >= 4) {
-            var cat = b.category.split(" / ")[0];
+            var cat = (b.category || "History").split(" / ")[0];
             catCount[cat] = (catCount[cat] || 0) + b.rating;
           }
         });
@@ -914,7 +909,6 @@
             }).catch(function() {});
         });
 
-        // Also check NYT current lists
         var nytPromises = ["hardcover-fiction", "hardcover-nonfiction"].map(function(list) {
           return fetch("https://api.nytimes.com/svc/books/v3/lists/current/" + list + ".json?api-key=" + NYT_KEY)
             .then(function(r) { return r.json(); })
@@ -930,18 +924,16 @@
           allResults.sort(function(a, b) { return b.score - a.score; });
           var final = allResults.slice(0, 15);
           setRecs(final);
-          // Save what user has seen
           var seenTitles = final.map(function(r) { return r.title; });
           localStorage.setItem("ab-new-seen", JSON.stringify({titles: seenTitles, ts: Date.now()}));
           setNewBooksAlert(false);
         }).finally(function() { setRecsLoading(false); });
       }
 
-      // Check for new books in background on load
       useEffect(function() {
         if (!user || books.length === 0) return;
         var lastSeen = JSON.parse(localStorage.getItem("ab-new-seen") || "null");
-        var checkInterval = 24 * 60 * 60 * 1000; // 24 hours
+        var checkInterval = 24 * 60 * 60 * 1000;
         if (lastSeen && (Date.now() - lastSeen.ts) < checkInterval) return;
 
         var topCats = getTopCategories();
@@ -964,8 +956,8 @@
       }, [user, books.length]);
 
       function recForBook(book) {
-        var cat = book.category.split(" / ")[0];
-        var subcat = book.category.split(" / ")[1] || "";
+        var cat = (book.category || "History").split(" / ")[0];
+        var subcat = (book.category || "").split(" / ")[1] || "";
         var queries = [
           "subject:" + cat + " bestseller",
           "subject:" + cat + (subcat ? " " + subcat : ""),
@@ -975,7 +967,7 @@
       }
 
       function recByCategory(cat) {
-        var topInCat = books.filter(function(b) { return b.category.indexOf(cat) >= 0 && b.rating >= 4; });
+        var topInCat = books.filter(function(b) { return (b.category || "").indexOf(cat) >= 0 && b.rating >= 4; });
         var queries = [
           "subject:" + cat + " bestseller",
           "subject:" + cat + " award winning"
@@ -988,7 +980,6 @@
         fetchMultiRecs(queries, "\u2728 Genie Picks: " + cat);
       }
 
-      // Fetch longer description when expanding a book
       useEffect(function() {
         if (!expanded) return;
         var book = books.find(function(b) { return b.id === expanded; });
@@ -1006,7 +997,6 @@
           }).catch(function(){}).finally(function() { setLoadDesc(null); });
       }, [expanded]);
 
-      // Search for book when adding
       function onBookAdded(book) {
         var bookWithUser = Object.assign({}, book, {user_id: user ? user.id : null});
         setBooks(function(prev) {
@@ -1031,10 +1021,9 @@
 
       var categories = [];
       var cs = {};
-      books.forEach(function(b) { if (!cs[b.category]) { cs[b.category] = true; categories.push(b.category); }});
+      books.forEach(function(b) { if (b.category && !cs[b.category]) { cs[b.category] = true; categories.push(b.category); }});
       categories.sort();
 
-      // Filter + Sort
       var filtered = books.slice();
       if (search) {
         var s = search.toLowerCase();
@@ -1048,16 +1037,15 @@
         else filtered = filtered.filter(function(b) { return b.rating === parseInt(ratF); });
       }
       if (hideOthers) filtered = filtered.filter(function(b) { return b.mine !== false; });
-      var sp = sort.split("-"); var sk = sp[0]; var sd = sp[1];
+      var sp2 = sort.split("-"); var sk = sp2[0]; var sd = sp2[1];
       filtered.sort(function(a, b) {
-        var v = sk === "title" ? a.title.localeCompare(b.title) : sk === "author" ? a.author.localeCompare(b.author) : sk === "category" ? a.category.localeCompare(b.category) : sk === "rating" ? a.rating - b.rating : 0;
+        var v = sk === "title" ? a.title.localeCompare(b.title) : sk === "author" ? a.author.localeCompare(b.author) : sk === "category" ? (a.category||"").localeCompare(b.category||"") : sk === "rating" ? a.rating - b.rating : 0;
         return sd === "desc" ? -v : v;
       });
 
       var rc = books.filter(function(b) { return b.rating > 0; }).length;
       var avg = rc > 0 ? (books.reduce(function(s, b) { return s + b.rating; }, 0) / rc).toFixed(1) : "\u2014";
 
-      // Share text
       var shareText = "";
       (function() {
         var rated = books.filter(function(b){return b.rating>0;}).sort(function(a,b){return b.rating-a.rating||a.title.localeCompare(b.title);});
@@ -1070,20 +1058,15 @@
       function handleCopy() { navigator.clipboard.writeText(shareText).then(function(){flash("Copied!");setShowShare(false);}).catch(function(){flash("Copy failed");}); }
 
       var userName = (user && user.user_metadata && user.user_metadata.first_name) ? user.user_metadata.first_name : (user && user.email ? user.email.split("@")[0].charAt(0).toUpperCase() + user.email.split("@")[0].slice(1) : "My");
-
       var syncDot = syncStatus === "synced" ? "var(--success)" : syncStatus === "syncing" ? "var(--gold)" : syncStatus === "error" ? "var(--danger)" : "var(--text3)";
       var syncLabel = syncStatus === "synced" ? "Synced" : syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Error" : "Local only";
 
-      /* MODAL HELPER */
       function Modal(props) {
         return E("div", {onMouseDown: function(e){if(e.target===e.currentTarget)props.onClose();}, onTouchEnd: function(e){if(e.target===e.currentTarget)props.onClose();}, style: {position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",backdropFilter:"blur(4px)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}},
           E("div", {style: {background:"var(--surface)",border:"1px solid var(--border)",borderRadius:14,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",animation:"fadeScale 0.2s",WebkitOverflowScrolling:"touch"}}, props.children)
         );
       }
 
-      /* RENDER */
-
-      /* Auth loading */
       if (authLoading) {
         return E("div", {style:{minHeight:"100vh",background:"var(--bg)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}},
           E("h1", {className:"serif",style:{fontSize:28,color:"var(--gold)"}}, "My Library"),
@@ -1091,7 +1074,6 @@
         );
       }
 
-      /* Login / Signup screen */
       if (!user) {
         return E("div", {style:{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}},
           E("div", {style:{maxWidth:380,width:"100%",textAlign:"center"}},
@@ -1113,7 +1095,7 @@
                 )
               )
             ),
-            E("p", {style:{marginTop:24,fontSize:11,color:"var(--text4)"}}, "Created by BDF")
+            E("p", {style:{marginTop:24,fontSize:11,color:"var(--text4)"}},"Created by BDF")
           )
         );
       }
@@ -1121,9 +1103,8 @@
       return E("div", {style:{minHeight:"100vh",background:"var(--bg)"},
         onDragOver:function(e){e.preventDefault();setDragOver(true);},
         onDragLeave:function(e){if(e.currentTarget===e.target||!e.currentTarget.contains(e.relatedTarget))setDragOver(false);},
-        onDrop:function(e){e.preventDefault();setDragOver(false);var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)handleImport({target:{files:[f]},preventDefault:function(){}}); }
+        onDrop:function(e){e.preventDefault();setDragOver(false);var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)handleImport({target:{files:[f]},preventDefault:function(){}});}
       },
-        /* Drop overlay */
         dragOver ? E("div", {style:{position:"fixed",inset:0,background:"rgba(201,168,76,0.15)",backdropFilter:"blur(4px)",zIndex:9998,display:"flex",alignItems:"center",justifyContent:"center",border:"3px dashed var(--gold)",margin:16,borderRadius:16}},
           E("div", {style:{textAlign:"center"}},
             E("div", {style:{fontSize:48,marginBottom:12}}, "\uD83D\uDCE5"),
@@ -1131,13 +1112,9 @@
             E("div", {style:{fontSize:13,color:"var(--text2)",marginTop:8}}, "Audible, Goodreads, or any CSV with Title & Author")
           )
         ) : null,
-        /* Toast */
         toast ? E("div", {style:{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",background:"var(--gold)",color:"var(--bg)",padding:"10px 24px",borderRadius:8,fontWeight:600,fontSize:13,zIndex:9999,animation:"fadeIn 0.25s"}}, toast) : null,
-
-        /* Hidden file input for CSV import */
         E("input", {ref:fileRef,type:"file",accept:".csv,.tsv,.txt",onChange:handleImport,style:{display:"none"}}),
 
-        /* Header */
         E("header", {style:{background:"linear-gradient(180deg,var(--surface),var(--bg))",borderBottom:"1px solid var(--border)",padding:"24px 16px 16px",position:"sticky",top:0,zIndex:100}},
           E("div", {style:{maxWidth:800,margin:"0 auto"}},
             E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}},
@@ -1178,7 +1155,6 @@
           )
         ),
 
-        /* Book List */
         E("main", {style:{maxWidth:800,margin:"0 auto",padding:"8px 16px 100px"}},
           filtered.map(function(book) {
             return E("div", {key:book.id,onClick:function(){setExpanded(expanded===book.id?null:book.id);},style:{borderBottom:"1px solid var(--border)",padding:"14px 0",cursor:"pointer",opacity:book.mine===false?0.35:1,transition:"opacity 0.2s"}},
@@ -1195,7 +1171,7 @@
                       E("span", {onClick:function(e){e.stopPropagation();handleFav(book.id);},style:{fontSize:16,cursor:"pointer",color:book.fav?"#C25450":"#5A5545",transition:"color 0.15s",userSelect:"none"}}, book.fav ? "\u2764" : "\u2661")
                     )
                   ),
-                  E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category),
+                  E("span", {style:{display:"inline-block",marginTop:6,fontSize:9,color:"var(--text3)",background:"var(--surface)",border:"1px solid var(--border)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,textTransform:"uppercase"}}, book.category || ""),
                   E("span", {onClick:function(e){e.stopPropagation();handleMine(book.id);},style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:book.mine===false?"var(--success)":"var(--text4)",background:book.mine===false?"rgba(90,154,106,0.1)":"transparent",border:"1px solid " + (book.mine===false?"rgba(90,154,106,0.3)":"var(--border)"),borderRadius:4,padding:"2px 7px",letterSpacing:0.3,cursor:"pointer"}}, book.mine===false ? "Mark Mine" : "Not Mine"),
                   E("span", {onClick:function(e){e.stopPropagation();recForBook(book);},style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"var(--gold)",background:"rgba(201,168,76,0.1)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,cursor:"pointer",fontWeight:500}}, "\u2728 Genie"),
                   book.fav ? E("span", {style:{display:"inline-block",marginTop:6,marginLeft:6,fontSize:9,color:"#C25450",background:"rgba(194,84,80,0.1)",border:"1px solid rgba(194,84,80,0.3)",borderRadius:4,padding:"2px 7px",letterSpacing:0.3,fontWeight:500}}, "\u2764 " + userName + "'s Favorite") : null,
@@ -1218,21 +1194,10 @@
             E("div", {style:{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}},
               E("button", {onClick:function(){setShowAdd(true);},style:{background:"var(--gold)",color:"var(--bg)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "+ Add Your First Book"),
               E("button", {onClick:function(){if(fileRef.current)fileRef.current.click();},style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"12px 24px",fontSize:14,fontWeight:600}}, "Bulk Upload CSV")
-            ),
-            E("div", {
-              onDragOver:function(e){e.preventDefault();e.stopPropagation();setDragOver(true);},
-              onDrop:function(e){e.preventDefault();e.stopPropagation();setDragOver(false);var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)handleImport({target:{files:[f]}});},
-              onClick:function(){if(fileRef.current)fileRef.current.click();},
-              style:{marginTop:20,border:"2px dashed var(--border)",borderRadius:12,padding:"30px 20px",textAlign:"center",cursor:"pointer",transition:"border-color 0.2s",maxWidth:400,margin:"20px auto 0"}
-            },
-              E("div", {style:{fontSize:32,marginBottom:8}}, "\uD83D\uDCE5"),
-              E("div", {style:{fontSize:14,color:"var(--text2)",fontWeight:500}}, "Drag & drop a CSV file here"),
-              E("div", {style:{fontSize:12,color:"var(--text4)",marginTop:4}}, "or click to browse \u00b7 Audible, Goodreads, or any CSV with Title & Author")
             )
           ) : filtered.length === 0 ? E("p", {style:{textAlign:"center",color:"var(--text3)",padding:60,fontSize:14}}, "No books match your filters.") : null
         ),
 
-        /* Account Modal */
         showSettings ? E(Modal, {onClose:function(){setShowSettings(false);}},
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Account"),
           E("div", {style:{display:"flex",flexDirection:"column",gap:16}},
@@ -1248,17 +1213,13 @@
           )
         ) : null,
 
-        /* Add Modal */
         showAdd ? E(Modal, {onClose:function(){setShowAdd(false);}},
           E(AddBookForm, {key:addKey, onAdd:onBookAdded, onClose:function(){setShowAdd(false);}})
         ) : null,
 
-        /* Share Modal */
         showShare ? E(Modal, {onClose:function(){setShowShare(false);}},
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:20}}, "Share"),
           E("div", {style:{display:"flex",flexDirection:"column",gap:12}},
-
-            /* Option 1: Share My Library (read-only) */
             E("div", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:10,padding:16}},
               E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
                 E("div", null,
@@ -1279,14 +1240,10 @@
                 },style:{background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"10px 16px",fontSize:13}}, "Copy as Text")
               )
             ),
-
-            /* Option 2: Invite to Build Their Own */
             E("div", {style:{background:"var(--bg)",border:"1px solid var(--border)",borderRadius:10,padding:16}},
-              E("div", {style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}},
-                E("div", null,
-                  E("div", {style:{fontSize:15,color:"var(--text)",fontWeight:600}}, "\u2728 Invite a Friend"),
-                  E("div", {style:{fontSize:12,color:"var(--text3)",marginTop:4}}, "They can create their own personal library")
-                )
+              E("div", null,
+                E("div", {style:{fontSize:15,color:"var(--text)",fontWeight:600}}, "\u2728 Invite a Friend"),
+                E("div", {style:{fontSize:12,color:"var(--text3)",marginTop:4}}, "They can create their own personal library")
               ),
               E("button", {onClick:function(){
                 var inviteMsg = "Check out My Personal Library \u2014 track your books, rate them, get personalized recommendations, and share your collection.\n\nCreate your own free library: https://benfischman71.github.io/audiobook-library/";
@@ -1297,12 +1254,10 @@
                 }
               },style:{width:"100%",background:"transparent",color:"var(--gold)",border:"1px solid var(--gold-dim)",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,marginTop:12}}, navigator.share ? "Send Invite" : "Copy Invite Link")
             ),
-
             E("button", {onClick:function(){setShowShare(false);},style:{background:"transparent",color:"var(--text3)",border:"1px solid var(--border)",borderRadius:8,padding:"10px 20px",fontSize:14,marginTop:4}}, "Close")
           )
         ) : null,
 
-        /* Recommendations Modal */
         showRecs ? E(Modal, {onClose:function(){setShowRecs(false);}},
           E("h2", {className:"serif",style:{fontSize:22,color:"var(--gold)",marginBottom:4}}, recsTitle),
           E("p", {style:{color:"var(--text3)",fontSize:11,marginBottom:16}}, "From NYT Bestsellers, Google Books & Open Library"),
